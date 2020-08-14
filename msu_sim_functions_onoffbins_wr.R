@@ -499,8 +499,8 @@ msu_sims_par <- function(tests=seq(0,1500,500), compliance=c(1,.8,.65), introduc
                       'R0.on'=R0.on,
                       'R0.off'=R0.off,
                       'test.scenario'=test.scenario)
-  vars <- vars %>% 
-    filter(R0.on == R0.off)
+  # vars <- vars %>% 
+  #   filter(R0.on == R0.off)
   
   if (is.null(ncores)){
     output <- rbindlist(apply(vars,1,FUN=function(x) msu_sim(tst = x[1], compliance = x[2], introduction = x[3],
