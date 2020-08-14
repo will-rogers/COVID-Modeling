@@ -8,7 +8,7 @@ source('msu_sim_functions_onoffbins_wr.R')
 
 # simulate epidemics ------------------------------------------------------
 set.seed(12345)
-output.2 <- msu_sims_par(tests=c(250, 500, 1000),
+output <- msu_sims_par(tests=c(250, 500, 1000),
                        compliance=c(1,.75,.50), 
                        introductions = c(25),
                        ppn_sympt = .2, 
@@ -19,11 +19,10 @@ output.2 <- msu_sims_par(tests=c(250, 500, 1000),
                        ncores=NULL) ## ncores not needed for this script at the moment 
                                   # just a demo in case we want to scale up
 
-output. <- output.2 %>% 
-  filter(R0.on == R0.off)
+# output <- output %>% 
+#   filter(R0.on == R0.off)
 
-output.2 <- running_tots(output.)
-output <- output.2
+output <- running_tots(output)
 
 # summarize variables -----------------------------------------------------
 output$compliance <- factor(output$compliance, levels = c("50%","75%", "100%"), labels = c("50% Compliance","75% Compliance", "100% Compliance"), ordered = T)
