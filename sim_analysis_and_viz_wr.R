@@ -3,12 +3,12 @@ library(dplyr)
 library(data.table)
 library(reshape2)
 library(mc2d)
-source('msu_sim_functions_onoffbins_wr.R')
+source('sim_functions_onoffbins_wr.R')
 
 
 # simulate epidemics ------------------------------------------------------
 set.seed(12345)
-output <- msu_sims_par(tests=c(250, 500, 1000),
+output <- sims_par(tests=c(250, 500, 1000),
                        compliance=c(1,.75,.50), 
                        introductions = c(25),
                        ppn_sympt = .2, 
