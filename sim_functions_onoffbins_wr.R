@@ -355,10 +355,7 @@ msu_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   contact.wait.3 <- array(0,c(1,sims,10))
   contact.wait.2 <- array(0,c(1,sims,10))
   contact.wait.1 <- array(0,c(1,sims,10))
-  
-  # distancing_reduction <- 0.5 # if trigger is crossed, NPIs are imposed and transmission is reduced by this fraction
-  # qi_trigger <- numeric(sims)
-  
+    
   for(ts in 2:Tsim){
     # if (test.scenario == "FL") {
     #   if(ts <= 20) {
