@@ -275,7 +275,7 @@ sir_step <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
 ############################################################################################################
 ############################################################################################################
 
-msu_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt = .8, 
+sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt = .8, 
                     care.seeking = 0.5, R0.on = 3, R0.off = 1.5, test.scenario = c("5 Days", "4 Days","3 Days","2 Days","1 Day","No Delay")){
   
   Tsim <- 100        # time to simulate over, we only care about start
@@ -484,7 +484,7 @@ msu_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
 
 
 
-msu_sims_par <- function(tests=seq(0,1500,500), compliance=c(1,.8,.65), introductions = 5, 
+sims_par <- function(tests=seq(0,1500,500), compliance=c(1,.8,.65), introductions = 5, 
                          ppn_sympt = 0.8, care.seeking = 0.5, R0.on = 2.5, R0.off = 2.5, 
                          test.scenario = c("5 Days", "4 Days","3 Days","2 Days","1 Day","No Delay"), ncores=NULL){
   # browser()
@@ -500,18 +500,18 @@ msu_sims_par <- function(tests=seq(0,1500,500), compliance=c(1,.8,.65), introduc
   #   filter(R0.on == R0.off)
   
   if (is.null(ncores)){
-    output <- rbindlist(apply(vars,1,FUN=function(x) msu_sim(tst = x[1], compliance = x[2], introduction = x[3],
+    output <- rbindlist(apply(vars,1,FUN=function(x) sim(tst = x[1], compliance = x[2], introduction = x[3],
                                                              ppn_sympt = x[4], care.seeking = x[5],
                                                              R0.on = x[6], R0.off = x[7], test.scenario = x[8])))
   } else {
     cl <- parallel::makeCluster(ncores)
-    parallel::clusterExport(cl,varlist=c('msu_sim','lengthen','sir_step'))
+    parallel::clusterExport(cl,varlist=c('sim','lengthen','sir_step'))
     parallel::clusterEvalQ(cl,{library(ggplot2)
                               library(dplyr)
                               library(data.table)
                               library(mc2d)})
     output <- rbindlist(parallel::parApply(cl,vars,1,
-                                           FUN=function(x) msu_sim(tst = x[1], compliance = x[2], introduction = x[3],
+                                           FUN=function(x) sim(tst = x[1], compliance = x[2], introduction = x[3],
                                                                    ppn_sympt = x[4], care.seeking = x[5],
                                                                    R0.on = x[6], R0.off = x[7], test.scenario = x[8])))
     parallel::stopCluster(cl)
