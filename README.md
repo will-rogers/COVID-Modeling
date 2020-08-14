@@ -9,4 +9,4 @@ Testing delays are also incorportated here. Symptomatic cases are removed at the
 
 The vizualization file should be able to run on its own by calling the contents of the functions file. Let me know if you have issues there. 
 
-This model is not peer-reviewed, nor do I try to claim any authority in epidemic modeling. I'm just an undergrad with a computer. This model does demonstrate how factors like student behavior, compliance, and testing delays affect epidemics. However, any estimates from this model are heavily qualified by the assumptions made. Please use with skepticism and reach out if you have comments, ideas, or questions. 
+This model is not peer-reviewed, nor do I try to claim any authority in epidemic modeling. I'm just an undergrad with a computer. This model does demonstrate how factors like student behavior, compliance, and testing delays affect epidemics. However, any estimates from this model are heavily qualified by the assumptions made. Please use with skepticism and reach out if you have comments, ideas, or questions (rogerswill47@gmail.com).
