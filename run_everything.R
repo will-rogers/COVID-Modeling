@@ -15,11 +15,16 @@ library(data.table)
 library(mc2d)
 library(abind)
 
-output <- uni_sims_par(tests=c(1,500,1000), compliance=1, introductions = 25, 
+output <- uni_sims_par(tests=c(0,500,1000), compliance=1, introductions = 25, 
                        ppn_sympt = 0.8, care.seeking = 1, R0.on = 2.5, R0.off = 2.5, 
                        test.scenario = c("No Delay"),
-                       sensitivity = c(.8, .9, 1), specificity = 1, times = c(1),
+                       sensitivity = c(.8, .9, 1), specificity = 1, times = c(1,2),
                        ncores=2)
 
 out <- running_tots(output)
 head(out)
+
+ggplot(out, aes(x = day, y = cum_cases.on+cum_cases.off, color = factor(sensitivity))) +
+  geom_smooth() +
+  facet_grid(tests~testing.per.patient)
+
