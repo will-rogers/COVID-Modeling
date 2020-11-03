@@ -60,7 +60,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   newSympt2.on <- newSympt1.on
   newSympt1.on <- dN_I1I2.on
   newSymptReportedTrue.on <- rbinom(sims,newSympt2.on,ppn_sympt) # randomly draw symtomatic individuals
-  newSymptReported.on <- floor(newSymptReportedTrue.on*care.seeking*(1-(1-sensitivity)^times))
+  newSymptReported.on <- floor(newSymptReportedTrue.on*care.seeking*(1-((1-sensitivity)^times)))
   R.on. <- R.on + dN_I2R.on
   
   S.off. <- S.off - dN_SE.off 
@@ -70,12 +70,12 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   newSympt2.off <- newSympt1.off
   newSympt1.off <- dN_I1I2.off
   newSymptReportedTrue.off <- rbinom(sims,newSympt2.off,ppn_sympt) # randomly draw symtomatic individuals
-  newSymptReported.off <- floor(newSymptReportedTrue.off*care.seeking*(1-(1-sensitivity)^times))
+  newSymptReported.off <- floor(newSymptReportedTrue.off*care.seeking*(1-((1-sensitivity)^times)))
   R.off. <- R.off + dN_I2R.off
   out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_I1I2.on, 
                 S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_I1I2.off ) # assume that I1->I2 is when cases become detectable
   
-  avail.tests <- tests/times #-(newSymptReported.on + newSymptReported.off) # we know testing is limited. Its is necessary to consider that
+  avail.tests <- tests #-(newSymptReported.on + newSymptReported.off) # we know testing is limited. Its is necessary to consider that
   # limited tests should be devoted to symptomatic cases first and THEN asymptomatic. This code takes the 
   # "available" # of tests and subtracts out the number of students needing a test to verify symptomology
   #avail.tests <- ifelse(avail.tests<0, 0, avail.tests) # if this number is less than zero, we are overdrawn for testing
@@ -84,10 +84,10 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   for (i in 1:sims){
     for (j in 1:10){
       if (j %in% c(3,4,8,9)){
-        tested[i,j] <- rbinom(1, atests[i,j], 1-(1-sensitivity)^times)
+        tested[i,j] <- rbinom(1, atests[i,j], 1-((1-sensitivity)^times)*compliance)
       }
       if (j %in% c(1,2,5,6,7,10)){
-        tested[i,j] <- rbinom(1, atests[i,j], (1-specificity)^times)
+        tested[i,j] <- rbinom(1, atests[i,j], 1-((specificity)^times)*compliance)
       }
     }
   }
@@ -98,7 +98,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   
   atests.isolate <- tested # holder for which tests will be positive that need to be isolated 
   # atests.isolate[,c(1,2,5,6,7,10)] <- 0 # set non-infected classes to 0
-  atests.isolate <- floor(atests.isolate*compliance)
+  atests.isolate <- floor(atests.isolate)
   
   atest.wait.3 <- sir_simple_step(atest.wait.2,sims,
                                   I1.on, I2.on, I1.off, I2.off, N.on, N.off,
@@ -149,10 +149,17 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   }
   
   tot.contacts <- tot.contacts.on + tot.contacts.off
-  
   contacts <- tot.contacts
-  contacts[,c(1,2,5,6,7,10)] <- 0
-  contacts <- floor(contacts*compliance*(1-(1-sensitivity)^times))
+  for (i in 1:sims){
+    for (j in 1:10){
+      if (j %in% c(3,4,8,9)){
+        contacts[i,j] <- rbinom(1, tot.contacts[i,j], 1-((1-sensitivity)^times)*compliance)
+      }
+      if (j %in% c(1,2,5,6,7,10)){
+        contacts[i,j] <- rbinom(1, tot.contacts[i,j], 1-((specificity)^times)*compliance)
+      }
+    }
+  }
   
   contact.wait.3 <- sir_simple_step(contact.wait.2,sims,
                                     I1.on, I2.on, I1.off, I2.off, N.on, N.off,

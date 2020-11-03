@@ -6,7 +6,7 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
                     sensitivity = 0.8, specificity = 0.99, times = 1){
   
   Tsim <- 100        # time to simulate over, we only care about start
-  sims <- 100    # number of simulations
+  sims <- 50    # number of simulations
   ppn_sympt <- as.numeric(ppn_sympt)
   compliance <- as.numeric(compliance)
   care.seeking <- as.numeric(care.seeking) 
@@ -34,11 +34,11 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   # storage 
   inf.on <- matrix(NA,Tsim,sims)  # storage for infectious class
   case.on <- matrix(NA,Tsim,sims) # storage for daily cases
-  S.on <- matrix(round(16750*0.85),1,sims)  # start with 0.85 susceptible
+  S.on <- matrix(round(6287 * 0.85),1,sims)  # start with 0.85 susceptible
   E.on <- matrix(floor(introductions*.25),1,sims)
   I1.on <- matrix(0,1,sims)                 # start with 5 asymptomatic infectious
   I2.on <- matrix(0,1,sims)
-  R.on <- matrix(16750 - S.on,1,sims)
+  R.on <- matrix(6287 - S.on,1,sims)
   sympt1.on <- matrix(0,1,sims)
   sympt2.on <- matrix(0,1,sims)
   symptrep.on <- matrix(0,1,sims)
@@ -54,11 +54,11 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   
   inf.off <- matrix(NA,Tsim,sims)  # storage for infectious class
   case.off <- matrix(NA,Tsim,sims) # storage for daily cases
-  S.off <- matrix(round(4000*0.85),1,sims)  # start with 0.85 susceptible
+  S.off <- matrix(round(10478 * 0.85),1,sims)  # start with 0.85 susceptible
   E.off <- matrix(ceiling(introductions*.75),1,sims)
   I1.off <- matrix(0,1,sims)                 # start with 5 asymptomatic infectious
   I2.off <- matrix(0,1,sims)
-  R.off <- matrix(4000 - S.off,1,sims)
+  R.off <- matrix(10478 - S.off,1,sims)
   sympt1.off <- matrix(0,1,sims)
   sympt2.off <- matrix(0,1,sims)
   symptrep.off <- matrix(0,1,sims)
@@ -112,7 +112,7 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
                     ppn_sympt = ppn_sympt, compliance = compliance, care.seeking = care.seeking,
                     atest.wait.3[ts-1,,],atest.wait.2[ts-1,,],atest.wait.1[ts-1,,],
                     contact.wait.3[ts-1,,], contact.wait.2[ts-1,,],contact.wait.1[ts-1,,],
-                    test.scenario, sensitivity, specificity, times) # call to SIR step function above
+                    test.scenario, sensitivity = sensitivity, specificity = specificity, times = times) # call to SIR step function above
     S.on <- rbind(S.on,out[,1])  # update state
     E.on <- rbind(E.on,out[,2])  # update state
     I1.on <- rbind(I1.on,out[,3])  # update state
