@@ -18,14 +18,14 @@ sens_sim <- function(tst = 500, compliance = 0.75, introductions = 50, ppn_sympt
   inf.days = 14
   day.asym = 5
   day.sym = 7
-  RE <- R0*.85  # RE assuming some fraction of population is already immune
+  RE <- R0  # RE assuming some fraction of population is already immune
   beta.normal <- RE * (1/9)  # calculate Beta
   beta_vec <- rep(beta.normal,sims)
   
   # storage 
   inf <- matrix(NA,Tsim,sims)  # storage for infectious class
   case <- matrix(NA,Tsim,sims) # storage for daily cases
-  S <- matrix(round(10000 ),1,sims)  # start with 0.85 susceptible
+  S <- matrix(round(10000-introductions),1,sims)  # start with 0.85 susceptible
   I <- array(0,c(Tsim,sims,inf.days))
   I[1,,] <- rmultinomial(sims, introductions, rep(1, inf.days))
   R <- matrix(0,1,sims)
@@ -44,7 +44,6 @@ sens_sim <- function(tst = 500, compliance = 0.75, introductions = 50, ppn_sympt
   new_recov <- matrix(0,1,sims)
   isolation <- matrix(0,1,sims)
   quarantine <- matrix(0,1,sims)
-  N <- matrix(S+sum(I[,,1:inf.days])+R,1,sims)
   
   for(ts in 2:Tsim){
     ts<-2
@@ -59,7 +58,6 @@ sens_sim <- function(tst = 500, compliance = 0.75, introductions = 50, ppn_sympt
     I[ts,,] <- out[,2:(inf.days+1)]  # update state
     active.inf <- rbind(active.inf,apply(out[,2:(inf.days+1)],1,sum))
     R <- rbind(R,out[,inf.days+2])  # update state
-    N <- rbind(N,N[ts-1])  # update state
     symptrep <- rbind(symptrep,out[,49])  # update state
     symptactual <- rbind(symptactual,out[,50])
     new_contacts <- rbind(new_contacts,apply(out[,51:66],1,sum))  # update state

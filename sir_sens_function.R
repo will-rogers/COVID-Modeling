@@ -14,7 +14,7 @@ sir_sens <- function (sims, S, I, R, N, inf.days = 14, day.asym = 5, day.sym = 7
   inf.days <- inf.days
   
   dN_SI <- rbinom(n=sims,size=S,
-                     prob=1-exp(-beta_vec*(apply(I[,day.asym:inf.days],1,sum))/(N)*delta.t)) 
+                     prob=1-exp(-beta_vec*(apply(I[,day.asym:inf.days],1,sum))/(10000)*delta.t)) 
   dN_II <- I[,1:(inf.days-1)]
   dN_IR <- I[,inf.days]
 

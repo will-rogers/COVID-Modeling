@@ -16,18 +16,17 @@ library(abind)
 
 set.seed(12345)
 
-output <- sens_sims_par(tests = c(0,500,1000), compliance = 1, introduction = 25,
+output <- sens_sims_par(tests = c(0,500,1000,5000), compliance = 1, introduction = 5,
                         ppn_sympt = 0.2, care.seeking = 1,
-                        R0 = 2.5, sensitivity = .5, times = 1, 
+                        R0 = 2.5, sensitivity = 1, times = 1, 
                         form = c("uniform-max","uniform-mean","uniform-min",
                                  "normal", "early beta", "late beta"), ncores = 2)
 
 out <- output %>% 
   group_by(group) %>% 
-  mutate(cum.cases.on = cumsum(new.cases))
+  mutate(cum.cases = cumsum(new.cases))
 
-
-ggplot(out, aes(x = day, y = cum.cases.on, color = form)) +
+ggplot(out, aes(x = day, y = cum.cases, color = form)) +
   geom_smooth() +
   facet_grid(.~tests)
 
