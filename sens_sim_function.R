@@ -46,7 +46,6 @@ sens_sim <- function(tst = 500, compliance = 0.75, introductions = 50, ppn_sympt
   quarantine <- matrix(0,1,sims)
   
   for(ts in 2:Tsim){
-    ts<-2
     tests <- tst
     out <- sir_sens(sims, S[ts-1,], I[ts-1,,], R[ts-1,], 
                     N[ts-1,], inf.days = inf.days, day.asym = day.asym, 
@@ -74,7 +73,9 @@ sens_sim <- function(tst = 500, compliance = 0.75, introductions = 50, ppn_sympt
     quarantine <- rbind(quarantine, apply(new_contacts[(max(1,ts-14)):ts,],2,sum) ) # quarantine for 14 days
   }
 
-  return(list("active.inf" = active.inf, 
+  return(list("S" = S,
+              "I" = active.inf, 
+              "R" = 10000-S-active.inf,
               "reporting.symptoms" = symptrep, 
               "all.symptomatics" = symptactual,
               "positive.asympt" = true_test_positives, 

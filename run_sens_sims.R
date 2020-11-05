@@ -16,11 +16,11 @@ library(abind)
 
 set.seed(12345)
 
-output <- sens_sims_par(tests = c(0,500,1000,5000), compliance = 1, introduction = 5,
+output <- sens_sims_par(tests = c(100,150,500), compliance = 1, introduction = 5,
                         ppn_sympt = 0.2, care.seeking = 1,
                         R0 = 2.5, sensitivity = 1, times = 1, 
-                        form = c("uniform-max","uniform-mean","uniform-min",
-                                 "normal", "early beta", "late beta"), ncores = 2)
+                        form = c("uniform-max",
+                                 "normal", "late beta"), ncores = 2)
 
 out <- output %>% 
   group_by(group) %>% 
@@ -28,7 +28,9 @@ out <- output %>%
 
 ggplot(out, aes(x = day, y = cum.cases, color = form)) +
   geom_smooth() +
-  facet_grid(.~tests)
+  facet_grid(.~tests) + 
+  labs(y = "Cumulative Cases") +
+  theme_classic()
 
 
 output$active.inf
@@ -40,3 +42,13 @@ ggplot(out, aes(x = day, y = cum_cases.on+cum_cases.off, color = factor(sensitiv
   geom_smooth() +
   facet_grid(tests~testing.per.patient)+
   theme_classic()
+
+
+
+hist(rpois(1000, 2))
+1000*.995
+
+
+
+
+

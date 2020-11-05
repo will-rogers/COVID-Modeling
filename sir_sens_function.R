@@ -12,7 +12,7 @@ sir_sens <- function (sims, S, I, R, N, inf.days = 14, day.asym = 5, day.sym = 7
                       sensitivity = .8, times = 1, form = form) {
   form <- form
   inf.days <- inf.days
-  
+  browser()
   dN_SI <- rbinom(n=sims,size=S,
                      prob=1-exp(-beta_vec*(apply(I[,day.asym:inf.days],1,sum))/(10000)*delta.t)) 
   dN_II <- I[,1:(inf.days-1)]
