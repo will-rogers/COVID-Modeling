@@ -1,5 +1,5 @@
 ### Running files 
-setwd("~/Downloads/Research/COVID-19/COVIDstuff-master/LAMP-Project")
+setwd("~/Downloads/Research/COVID-19/LAMP/COVID-Modeling")
 
 # Always rerun these if you edit the source file
 source("sir_lamp_function.R")
@@ -15,17 +15,20 @@ library(data.table)
 library(mc2d)
 library(abind)
 
-output <- uni_sims_par(tests=c(500), compliance=1, introductions = 25, 
-                       ppn_sympt = 0.8, care.seeking = 1, R0.on = 2.5, R0.off = 2.5, 
-                       test.scenario = c("No Delay"),
-                       sensitivity = c(.8, .9, 1), specificity = 1, times = c(1,2),
-                       ncores=2)
+set.seed(12345)
+output <- uni_sims_par(tests=c(1000), compliance=.8, introductions = 20, 
+                       ppn_sympt = 0.4, care.seeking = .5, R0.on = 3, R0.off = 3, 
+                       test.scenario = c("No Delay"), sens.pcr = c(.99), spec.pcr = .99,
+                       sens.lamp = c(1), spec.lamp = .99, 
+                       ncores=NULL)
 
 out <- running_tots(output)
-head(out)
-
-ggplot(out, aes(x = day, y = cum_cases.on+cum_cases.off, color = factor(sensitivity))) +
-  geom_smooth() +
-  facet_grid(tests~testing.per.patient)+
+ggplot(out, aes(x = day, y = cum_all.symptomatics.on+cum_all.symptomatics.off, color = factor(sens.pcr))) +
+  geom_smooth() + 
+  facet_grid(tests~.)+
   theme_classic()
+
+
+
+
 

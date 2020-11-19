@@ -1,8 +1,8 @@
 #### Setup sensivity vs viral load sims ####
 
 sens_sim <- function(tst = 500, compliance = 0.75, introductions = 50, ppn_sympt = .8, 
-                     care.seeking = 0.5, R0 = 3, sensitivity = 0.8, times = 1, 
-                     form = form){
+                     care.seeking = 0.5, R0 = 3, sens.pcr = .99, spec.pcr = .99, 
+                     sens.lamp = c(.8, .9, 1), spec.lamp = .99){
   
   Tsim <- 100        # time to simulate over, we only care about start
   sims <- 100    # number of simulations

@@ -3,19 +3,22 @@
 
 uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt = .8, 
                     care.seeking = 0.5, R0.on = 3, R0.off = 1.5, test.scenario = c("2 Days","1 Day","No Delay"),
-                    sensitivity = 0.8, specificity = 0.99, times = 1){
+                    sens.pcr = .99, spec.pcr = .99, 
+                    sens.lamp = c(.8, .9, 1), spec.lamp = .99, lamp.diagnostic = F){
   
   Tsim <- 100        # time to simulate over, we only care about start
-  sims <- 50    # number of simulations
+  sims <- 200    # number of simulations
+  lamp.diagnostic <- lamp.diagnostic
   ppn_sympt <- as.numeric(ppn_sympt)
   compliance <- as.numeric(compliance)
   care.seeking <- as.numeric(care.seeking) 
   introductions <- as.numeric(introductions)
   tst <- as.numeric(tst)
   test.scenario <- test.scenario
-  sensitivity <- as.numeric(sensitivity)
-  specificity <- as.numeric(specificity)
-  times <- as.numeric(times)
+  sens.pcr <- as.numeric(sens.pcr)
+  spec.pcr <- as.numeric(spec.pcr)
+  sens.lamp <- as.numeric(sens.lamp)
+  spec.lamp <- as.numeric(spec.lamp)
   R0.on <- as.numeric(R0.on)   
   R0.off <- as.numeric(R0.off)
   
@@ -70,6 +73,9 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   true_test_positives.off <- matrix(0,1,sims)
   total_traces.off <- matrix(0,1,sims)
   comply_test_positives.off <- matrix(0,1,sims)
+  symp.pcr <- matrix(0,1,sims)
+  asymp.pcr <- matrix(0,1,sims)
+  missed.pcr <- matrix(0,1,sims)
   N.off <- S.off+E.off+I1.off+I2.off+R.off
   
   atest.wait.3 <- array(0,c(1,sims,10))
@@ -112,7 +118,8 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
                     ppn_sympt = ppn_sympt, compliance = compliance, care.seeking = care.seeking,
                     atest.wait.3[ts-1,,],atest.wait.2[ts-1,,],atest.wait.1[ts-1,,],
                     contact.wait.3[ts-1,,], contact.wait.2[ts-1,,],contact.wait.1[ts-1,,],
-                    test.scenario, sensitivity = sensitivity, specificity = specificity, times = times) # call to SIR step function above
+                    test.scenario, sens.pcr = sens.pcr, spec.pcr = spec.pcr, 
+                    sens.lamp = sens.lamp, spec.lamp = spec.lamp, lamp.diagnostic = lamp.diagnostic) # call to SIR step function above
     S.on <- rbind(S.on,out[,1])  # update state
     E.on <- rbind(E.on,out[,2])  # update state
     I1.on <- rbind(I1.on,out[,3])  # update state
@@ -145,6 +152,10 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
     new_cases.off <- rbind(new_cases.off,out[,12])  # update state
     total_traces.off <- rbind(total_traces.off, apply(out[,44:48],1,sum))# update state
     
+    symp.pcr <- rbind(symp.pcr, out[,132])
+    asymp.pcr <- rbind(asymp.pcr, out[,133])
+    missed.pcr <- rbind(missed.pcr, out[,134])
+    
     atest.wait.3 <- abind(atest.wait.3, array(out[,72:81], c(1,sims,10)), along = 1)
     atest.wait.2 <- abind(atest.wait.2, array(out[,82:91], c(1,sims,10)), along = 1)
     atest.wait.1 <- abind(atest.wait.1, array(out[,92:101], c(1,sims,10)), along = 1)
@@ -164,7 +175,6 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   inf.off <- I1.off+I2.off   # total infectious on campus
   case.on <- new_cases.on # daily cases
   case.off <- new_cases.off
-  
   return(list("active.inf.on" = inf.on, 
               "reporting.symptoms.on" = symptrep.on, 
               "all.symptomatics.on" = symptactual.on,
@@ -181,6 +191,9 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
               "isolation.complying.off" = isolation.off,
               "quarantine.complying.off" = quarantine.off,
               "total_traces.off" = total_traces.off,
+              "symp.pcr" = symp.pcr,
+              "asymp.pcr" = asymp.pcr,
+              "missed.pcr" = missed.pcr,
               "tests"= matrix(tst,Tsim,sims),
               "compliance" = matrix(compliance,Tsim,sims),
               "introductions"= matrix(introductions,Tsim,sims),
@@ -190,8 +203,10 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
               "R0.on" = matrix(R0.on,Tsim,sims),
               "R0.off" = matrix(R0.off,Tsim,sims),
               "test.scenario" = matrix(test.scenario,Tsim,sims),
-              "sensitivity" = matrix(sensitivity,Tsim,sims),
-              "specificity" = matrix(specificity,Tsim,sims),
-              "testing.per.patient" = matrix(times,Tsim,sims)
-  ))
+              "sens.pcr" = matrix(sens.pcr,Tsim,sims),
+              "spec.pcr" = matrix(spec.pcr,Tsim,sims),
+              "sens.lamp" = matrix(sens.lamp,Tsim,sims),
+              "spec.lamp" = matrix(spec.lamp,Tsim,sims),
+              "lamp.diagnostic" = matrix(lamp.diagnostic,Tsim,sims)
+              ))
 }
