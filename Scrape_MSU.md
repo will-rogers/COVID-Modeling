@@ -55,9 +55,9 @@ Note this needs to be updated on Friday. The current report format (PDF)
 does not easily lend itself to data scraping.
 
 ``` r
-Gallatin_Surveillance <- tibble(day = c('9/3/2020','9/10/2020', '9/17/2020', '9/24/2020', '10/2/2020', '10/8/2020', '10/15/2020',"10/22/2020", '10/29/2020','11/05/2020','11/12/2020'), 
-                                new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265), 
-                                cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990) ) %>%
+Gallatin_Surveillance <- tibble(day = c('9/3/2020','9/10/2020', '9/17/2020', '9/24/2020', '10/2/2020', '10/8/2020', '10/15/2020',"10/22/2020", '10/29/2020','11/05/2020','11/12/2020','11/19/2020'), 
+                                new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265,203), 
+                                cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990,1193) ) %>%
                     mutate(day = mdy(day), period = as.character(1:length(new_MSU_cases))) %>% 
   full_join(data_in, by = 'day')%>% arrange(day)  %>%
   fill(period, .direction = 'up') %>%
@@ -79,6 +79,6 @@ MSU %>% ggplot(aes(y = daily_integers, x = day)) + geom_line() +
   labs(caption = 'Data interpolated from data scraped from the  COVID-19 Dashboard by the Center for Systems Science \n and Engineering  at JHU and Gallatin County Weekly COVID-19 Surveillance Reports \n Monthly MSU cases are allocated to individual days using the proportion of Gallatin County cases on that day of the week')
 ```
 
-    ## Warning: Removed 1 row(s) containing missing values (geom_path).
+    ## Warning: Removed 2 row(s) containing missing values (geom_path).
 
 ![](Scrape_MSU_files/figure-gfm/unnamed-chunk-2-1.png)<!-- -->
