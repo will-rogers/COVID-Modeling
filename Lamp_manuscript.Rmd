@@ -1,0 +1,318 @@
+---
+title: "Modeling the implementation of LAMP on a college campus for rapid, frequent, scalable surveillance of SARS-CoV-2"
+author:
+  - Will Rogers
+  - and others to be added later
+date: "`r format(Sys.time(), '%Y %B %d')`"
+output: 
+   pdf_document: 
+      keep_tex: yes
+latex_engine: pdflatex
+bibliography: bibliography.bib
+---
+
+
+```{r, include = F}
+library(tidyverse)
+```
+
+#### Abstract:
+
+SARS-CoV-2 can spread quickly through a college campus, posing a threat to students, faculty, and staff. We simulate an outbreak of SARS-CoV-2 on a university campus using a compartmental susceptible exposed infectious recovered (SEIR) model. We explore the implementation of rapid, repeated, widespread screening for SARS-CoV-2 using a novel loop-mediated isothermal amplification (LAMP) assay. We examine the influence of the number of tests deployed, the frequency of testing, and the sensitivity of tests on the overall epidemic size. We also track the demand on capacity (e.g., confirmatory PCR testing, staff, isolation rooms) given different testing scenarios. Next, we will refine our parameter values to reflect an outbreak at Montana State University and will integrate pooled testing approaches into the SEIR models.
+
+\section{Introduction \label{introduction}}
+We explore the implementation of an inexpensive, rapid, scalable COVID-19 test on the Montana State University campus. Reverse-transcription loop-mediated isothermal amplification (RT-LAMP), is new technology that can detect viruses in saliva with minimal reagents and equipment. Results can take less than 30 minutes and can be sensitive (>90\%) and specific (>98\%).  We simulate the widespread and frequent screening of students at MSU with LAMP to assess the optimal magnitude and frequency of testing required to control an outbreak of SARS-CoV-2 during spring semester. We assume that LAMP testing is a part of a suite of mitigation strategies including mask wearing, social distancing, and hygiene. We also assume that LAMP surveillance is employed concurrently with diagnostic PCR for symptomatic students and that infected students identified during LAMP surveillance are isolated, and that their contacts are traced and quarantined with varying levels of compliance. Future work will integrate pooling scenarios into the LAMP testing framework. 
+Symptomatic screening on MSU campus during fall semester, with associated tracing and isolation, was unable to stop the spread of SARS-CoV-2 on campus. Given that over 50\% of students are likely to be asymptomatic (Denny et al. 2020 Duke Surveillance), a substantial proportion of infected students at MSU were not identified with symptomatic testing and probably contributed to the epidemic that led to over 1,193 detected cases of COVID-19 on campus. 
+Here we provide initial model output from simulations of frequent, rapid screening of students with LAMP.
+
+\subsection{Surveillance and Testing on College Campuses}
+Numerous other college campuses have implemented
+
+\subsubsection{Synthetic College Population}
+@larremore2020test show that frequent testing, even with lower sensitivity (in terms of detection) can effectively drive epidemics to extinction. The major takeaway point was that testing frequency, and not test sensitivity, was the primary driver of controlling epidemics.
+
+\subsubsection{University of Colorado Boulder}
+\subsubsection{Duke University}
+Duke University (@duke) implemented the "Duke Compact" which among other things included:
+
+\begin{itemize}
+    \item 14 day self quarantine prior to arrival on campus,
+    \item required testing upon arrival to campus,
+    \item (roughly) bi-weekly asymptomatic surveillance testing using pools of 5, and
+    \item daily symptom monitoring via a cell phone app.
+\end{itemize}
+
+From August 2 to October 11, Duke tested nearly 70,000 specimens (using pooled testing) for 10,265 graduate and undergraduate students. A total of 84 (.8\%) were positive, which includes 17 cases that were detected as students returned to campus. Furthermore, about half of the students were asymptomatic. 
+
+
+\subsubsection{University of New Hampshire}
+\subsubsection{University of Notre Dame}
+\subsubsection{University of Illinois Urbana Champaign}
+
+
+\section{Comparing Model Output to empirical
+ data from
+MSU \label{comparison-of-symptomatic-cases-in-model-to-empirical-cumulative-data-from-msu}}
+We collected cumulative case counts (weekly) from the Gallatin County Department of Health \cite{healthy_gallatin_2020}. These data were assumed to be the aggregated totals of symptomatic students associated with Montana State University, as asymptomatic students are unlikely to seek care. We compared these counts to the output of a susceptible-exposed-infected-recovered (SEIR)compartment model of a potential outbreak on campus. The conditions for the 200 simulations[\ref{fig:days}] assumed that 75\% of students comply with behavioral controls post-testing or contact tracing, 50\% of students with symptoms seek a test, a mean of 5 contacts can be traced per positive case - 20\% symptomatic, 80\% asymptomatic, there is a 1 day delay in action on contact tracing and there is no asymptomatic testing, there are 50 infectious introductions, 15\% of Students are immune (recovered or otherwise), R0 is 2.6, RE is 2.6*0.85, or 2.21, PCR has perfect sensitivity and specificity.
+
+This is not a truly “fit” model, instead we have chosen reasonable estimates from parameter space to approximate fit. In the future, this will entail a model-fitting procedure, augmented by data from the campus outbreak. However, our intention is not to predict cases, we only show this to demonstrate that our model, developed in summer 2020, captures the trend of the outbreak at MSU during fall 2020.
+
+\begin{figure}[h!]
+\includegraphics{figures/fig1-1.pdf}
+\caption{ }
+\label{fig:days}
+\end{figure}
+
+\section{Testing frequency, not testing sensitivity, is the major
+driver of epidemic
+size \label{testing-frequency-not-testing-sensitivity-is-the-major-driver-of-epidemic-size}}
+The sensitivity and specificity of LAMP vs. the current standard, qPCR, has been evaluated. While initial estimates of sensitivity and specificity are encouraging (around 92.5\% and 98\%, respectively), the efficacy of LAMP as a diagnostic vs. surveillance tool is not known. LAMP, as the scales discussed below, may allow for public health officials to identify far more positive cases that would be possible if relying on symptomatic students seeking a diagnostic qPCRtest. However, the lower sensitivity of LAMP than qPCR (meaning that false-negatives are more frequent), could affect the effectiveness of LAMP as a screening tool. We evaluated increasing test frequency versus increasing test sensitivity within the SEIR model. 
+
+For the following and all below simulations, we assumed that 100\% of students comply with behavioral controls post-testing or contact tracing (to isolate sensitivity), that 100\% of students with symptoms seek care (to isolate sensitivity), a mean of 5 contacts can be traced per positive case, 20\% symptomatic, 80\% asymptomatic, 1 day delay in action on contact tracing, a variable number of LAMP and subsequent dynamic number of PCR confirmation tests per day, 50 infectious introductions, 15\% of Students are assumed immune (recovered or otherwise), R0 is 2.6, RE is 2.6*0.85, or 2.21, PCR has perfect sensitivity and specificity, LAMP is has a variable sensitivity, and specificity, though only sensitivity is considered here.
+
+The number of LAMP tests per day (the faceting value across the top of figure \ref{fig:dynamite}) was more important than the sensitivity of the LAMP test in driving the total size of an epidemic. Increasing the number of tests available, and increasing the frequency of testing, is more important than increasing the sensitivity of LAMP alone. 
+
+```{r, fig.cap = "Figure created directly from R code", fig.width = 6, fig.height = 4, echo = F}
+df <- data.frame(day = seq(18, by = 7, length.out = 11), 
+                 new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265),
+                 cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990))
+
+df %>% ggplot(aes(x = day, y = cumulative_MSU_cases)) + 
+  geom_point() + theme_bw() + 
+  ylab("Cumulative MSU COVID-19 Cases") +
+  labs(title = "Reported MSU COVID-19 Cases", caption = 'source: Gallatin county health department ')
+
+```
+
+
+\begin{figure}[h!]
+\includegraphics{figures/unnamed-chunk-1-1.pdf}
+\caption{ }
+\label{fig:dynamite}
+\end{figure}
+
+\section{High testing frequency reduces epidemic size and
+consequently reduces PCR
+demand \label{high-testing-frequency-reduces-epidemic-size-and-consequently-reduces-pcr-demand.}}
+
+The number of qPCR tests available for MSU students is inadequate to meet the current demand. Currently, all LAMP-positive individuals need to be verified via qPCR before public health action is taken (isolation, contact tracing). If LAMP  identifies more cases, more qPCR tests will be required. 
+
+Using the same parameters as above, we recorded the total number of symptomatic cases and random, LAMP-detected cases per day. We considered varied scenarios of LAMP implementation (number of tests per day is the faceting variable in figure \ref{fig:pcr}) and LAMP sensitivity 80\%-100\%. We then multiplied the total number of symptomatic qPCR positive tests per day by 10, approximating how many tests would need to be run to find that many positive cases based on a 10\% test positivity rate. Test positivity is a dynamic response to both the prevalence of infection and the sampling of the infected population. As such, the simple modifier presented here is too simplistic and is overestimating current test positivity (that is exceeding 20\%).
+
+In general, LAMP identifies cases which would otherwise go undetected if testing is based only on symptomatic qPCR. As such, even minor increases in LAMP testing are capable of reducing the epidemic size and thus overall qPCR demand. This trend continues until scenarios of 2000-4000 LAMP tests per day flatten the curve so that COVID-19 is extirpated and there is no qPCR demand. The additional effort to confirm LAMP tests with qPCR is compensated by the overall ability for LAMP to identify asymptomatic cases and reduce the size of the epidemic.
+
+\begin{figure}[h!]
+\includegraphics{figures/unnamed-chunk-2-1.pdf}
+\caption{ }
+\label{fig:pcr}
+\end{figure}
+
+\section{The total number of missed cases is driven by prevalence
+and testing
+frequency \label{the-total-number-of-missed-cases-is-driven-by-prevalence-and-testing-frequency}}
+
+One concern with lower sensitivity testing, such as LAMP, is how many students will be provided with inaccurate test results. Negative LAMP results will not be confirmed via qPCR. The ability to create false negative results is relevant certainly legally or optically for the university, and may have some epidemiological implications. Foremost, low-sensitivity tests will produce false negatives, causing positive students to not isolate and potentially engage in riskier behaviors than otherwise. Secondly, as the epidemic grows in size, there are more positive students to be randomly ruled as false negatives. Therefore, the number of missed cases, or true-positive cases which are ruled as negatives, will consequently be shaped by the size of the epidemic and the sensitivity of LAMP. 
+
+We considered scenarios of 100-4000 LAMP tests per day with LAMP sensitivity ranging from 80\%-95\% [figure \ref{fig:cases}]. When testing frequency was low, the sensitivity of the LAMP test slightly affected the number of missed cases. As the testing frequency increased, the number of false positives rose, greatest for low sensitivity tests. Beyond 1000 LAMP tests per day, the epidemic size was reduced by broad-surveillance, and so the number of missed cases consequently fell. Across all scenarios, increasing the sensitivity was a strong method for reducing the consequences of LAMP testing. However, we again are faced with testing frequency, not just sensitivity, as a driver of LAMP outcomes.
+
+\begin{figure}[h!]
+\includegraphics{figures/unnamed-chunk-4-1.pdf}
+\caption{ }
+\label{fig:cases}
+\end{figure}
+
+\section{next steps \label{next steps}}
+
+For next steps we will: 1) refine the parameter space using data from case counts on university campuses; 2) incorporate parameters that reflect later-stage epidemics with some herd immunity; 3) consider scenarios of delayed LAMP implementation; 4) include variations in the method of LAMP testing (e.g., daily vs. bi-weekly testing, LAMP as a diagnostic, etc.); integrate pooling approaches into the model that are optimized for the stage of epidemic. 
+
+\begin{table*}[!b]
+{\tiny
+\centering
+\begin{tabular}{lllll}
+  \hline
+Parameter & Priority & Current Value & Source & Comments/Links \\ 
+  \hline
+Number of PCR tests per day & High & 200 & S. Walk (August) & Likely Outdated \\ 
+  Number of contacts traced for on-campus students & High & 7 & M. Ferrari &  \\ 
+  Number of contacts traced for on-campus students & High & 7 & M. Ferrari &  \\ 
+  Delays in reporting test results & High & 1 day & Campus Updates &  \\ 
+  Delays in contact tracing & High & 1 day & Campus Updates &  \\ 
+  LAMP sensitivity & High & 0.92* & C. Chang & Will change \\ 
+  LAMP specificity & High & 0.98* & C. Chang & May change \\ 
+  Total number of contact tracing events per day & High & infinite & fixed by contacts per student & Need to incorporate max \\ 
+  Multiplier for dilution effect in pooling & High & 1* & C. Chang & Will change \\ 
+  Number of Students & Low & 16,750 & MSU Office of Planning and Analysis & \href{www.montana.edu/opa/facts/quick.html}{MSU Quick Facts} \\ 
+  On-campus Proportion & Low & 0.25 & MSU Office of Planning and Analysis & \href{www.montana.edu/opa/facts/quick.html}{MSU Quick Facts} \\ 
+  Days from Infection to infectious & Low & 5 & Informal Lit Review &  \\ 
+  Days infectious until symptoms & Low & 2 & Informal Lit Review &  \\ 
+  Days from symptoms to recovered & Low & 7 & Informal Lit Review &  \\ 
+  Number on Initial Infections & Low & 100 & Unofficial Fit &  \\ 
+  Proportion Immune & Low & 0.15 & M. Ferrari &  \\ 
+  PCR sensitivity & Low & 1 & C. Chang & More of a control \\ 
+  PCR specificity & Low & 1 & C. Chang & More of a control \\ 
+  Number of isolation rooms & Low & 90 & MSU August Comm. & Not important \\ 
+  Number of quarantine rooms & Low & 140 & MSU August Comm. & Not important \\ 
+  Reffective & Mid & 2.5-3 & Unofficial Fit &  \\ 
+  Proportion of Students seeking care & Mid & 0.5 & Guess &  \\ 
+  Proportion of students complying & Mid & 0.75 & Guess &  \\ 
+  Positivity Rate & Mid & 205 & Campus Updates & Could have as a check \\ 
+  Daily Cases & Mid &  & Campus/Community Updates & Could have as a check \\ 
+  Likely LAMP Capacity & Mid & 400/day & C. Chang & Might grow over time \\ 
+  Number of samples per pool & Mid & 4-10 & A. Hoegh & Not yet Implemented \\ 
+   \hline
+\end{tabular}}
+\caption{Parameter value descriptions and sources.}
+\label{tab:params}
+\end{table*}
+
+
+\section{Appendix}
+
+\subsection{Model Description}
+
+
+
+We developed two models: (Model A) a campus-level model with behavioral,
+testing, and transmission controls and (Model B) a theoretical and
+simplistic approach to viral load as a moderator of low-sensitivity
+efficacy. These models are meant to achieve a core set of goals
+addressing the implementation of loop-mediated isothermal amplification
+(LAMP), a generally high specificity but lower sensitivity, rapid test
+for SARS-CoV-2. Alternative tests (e.g., PCR) are more sensitive, but
+are costly in time and in materials.
+
+
+\subsubsection{Model A:}\label{model-a}
+
+\begin{center}\includegraphics[width=0.5\linewidth]{figures/model_a} \end{center}
+
+This is a simple SEIR model. SEIR refers to four disease compartments,
+foo susceptible, exposed (infected but not infectious), infectious, and
+recovered. The progression from S to E is stochastic and determined by a
+rate S\(_{t-1}\) \((1-e^{-\beta \frac{I_{t-1}}{N_{t-1}}})\). The rate of
+progression from E to I is stochastic and determined by the rate
+\(1 - e^{\frac{1}{5}}\), related to an assumed incubation period of
+about 5 days. I, in our model, is broken into pre-symptomatic (I1) and
+post-symptomatic (I2) infections. Individuals in I1 are infectious, but
+not yet symptomatic. Individuals in I2 are infectious and a proportion
+of I2 infections are symptomatic (e.g., if 20\% are I2s are symptomatic,
+80\% would be asymptomatic). This boxcar approach to modeling
+approximates a more realistic infectious period than a traditional
+exponential process. Transition from I1 to I2 is determined by a
+pre-symptomatic period of 2 days, \(1-e^{\frac{1}{2}}\). Transitions
+from I2 to R are determined by a post-symptomatic period of 7 days,
+\(1 - e^{\frac{1}{7}}\). There are two basic population components in
+the model, on-campus and off-campus students. The abundance of each is
+based on enrollment data from the MSU registrar (estimated). The two
+populations have homogeneous mixing (this can be altered in future
+iterations). Each population has a mean number of contacts (assumed to
+be 7).
+
+Individuals can be removed from the population in three ways: (1) when
+symptomatic cases are tested, they are immediately isolated, (2) when
+individuals are tested by random surveillance and return a positive
+test, they are removed after some delay, and (3) when a contact of an
+infectious person tests positive, they are immediately isolated. The
+ability to identify infectious cases is determined by the proportion of
+cases that are symptomatic, the sensitivity of the test, and the
+probability that a student seeks care after developing symptoms.
+Surveillance is applied to a random sample of the population, including
+S, E, I1, I2, and R compartments, and is agnostic to the disease state.
+The probability that a person is isolated from the population is
+determined by the number of tests, the prevalence of disease in the
+population, the sensitivity of the test, and the probability that the
+student will comply with isolation. Finally, contacts are randomly drawn
+from a Poisson distribution with a mean of 7. This random generation of
+contacts is then multiplied by the number of positive cases discovered
+through diagnostic and surveillance testing. The total number of
+contacts is then randomly removed from the population, proportional to
+the number of individuals in each compartment, and the probability that
+the individual will comply with quarantine. In the current model
+iteration, all contacts are affected by the sensitivity of the test
+because we assume that all contacts are tested.
+
+Our models can be adjusted to examine the effects of testing delays.
+Symptomatic cases are removed at the time of testing (assuming they are
+told to isolate while waiting for results). Contacts are tested when a
+close contact returns a positive test and are removed after a delay.
+Surveillance-tested individuals are tested randomly and are removed
+after a positive test. So, with a 2-day delay in testing: a symptomatic
+person tested on day 0 would be removed on day 0. The close contacts of
+a symptomatic person would be contacted/tested on day 2 and removed on
+day 4 if positive. Asymptomatic individuals tested on day 0 would be
+removed after a positive test on day 2, etc. The model operates on a
+daily timestep and a number of variables are collected and exported
+across the entire number of simulations and length of simulations.
+
+
+\subsubsection{Model B: \label{model-b}}
+
+\begin{center}\includegraphics[width=0.5\linewidth]{figures/model_a} \end{center}
+
+In model B, instead of E, I1, and I2 compartments, there are 14 I
+compartments, one for each day in the 14 day infectious period,
+functioning as a large boxcar chain. Individuals move through one bin
+per day until recovery on day 15. Viral loads are known to vary across
+the infectious period, rising to a peak around the onset of symptoms and
+decreasing beyond that. As a result, low-sensitivity tests like LAMP may
+be most effective in the early stages of the infectious period. We
+created distributions including uniform, normal, and beta distributions
+to affect the probability of a positive result as a function of the
+stage in the infectious period. This model is under development and will
+be useful for the investigation of test sensitivity in pooled samples
+and for comparing the efficacy of PCR vs LAMP.
+
+In general, we intend to inform the following goals:
+
+\subsubsection{Model A: \label{model-a-1}}
+
+\begin{enumerate}
+\item Explore the effectiveness of LAMP surveillance testing with varying
+  test sensitivity (partially completed)
+\item Determine the effectiveness of LAMP given different testing scenarios
+  (e.g., the number and frequency of tests, number of tests per
+  individual) (partially completed)
+\item Determine the stage of an epidemic (population) and the infectious
+  period (individual) in which LAMP is most effective 4. Compare LAMP
+  versus PCR, and LAMP used synergistically with PCR, as strategies to
+  manage the epidemic on campus.
+\end{enumerate}
+
+
+\subsubsection{Model B: \label{model-b-1}}
+
+\begin{enumerate}
+\item Explore how the distribution of viral load over time in an infected
+  individual affects the value of LAMP and PCR (partially completed) as
+  a tool to manage transmission dynamics on campus (uncompleted)
+\item Determine when pooling can improve the efficacy of surveillance (in
+  relation to prevalence, dilution of pools, and the sensitivity of
+  LAMP).
+\end{enumerate}
+
+We have completed the first iterations of Models A and B. Are next steps
+are to:
+
+\subsubsection{Model A: \label{model-a-2}}
+
+\begin{enumerate}
+\item Add stochastic introduction of infections from the community
+  (variable)
+\item Parametrize contact tracing, isolation efficacy, and characteristics
+  of LAMP and PCR
+\item Parametrize epidemiological assumptions of incubation period,
+  proportion asymptomatic, and student behavior and demographics (on/off
+  campus)
+\end{enumerate}
+
+\subsubsection{Model B: \label{model-b-2}}
+
+\begin{enumerate}
+\item Refine boxcar approach to allow for stochasticity in movement between
+  categories and reduce parameters
+\item Make an individual's infectiousness tied to viral load
+\item Build a function to describe pooling and integrate with the testing
+  and removal process
+\end{enumerate}
+
+## References
