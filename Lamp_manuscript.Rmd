@@ -1,8 +1,8 @@
 ---
 title: "Modeling the implementation of LAMP on a college campus for rapid, frequent, scalable surveillance of SARS-CoV-2"
 author:
-  - Will Rogers
-  - and others to be added later
+  - Prepared by Will Rogers, Wyatt Madden, Dale Hansen, Braden Scherting, Manuel Ruiz Aravena
+  -  Maureen Kessler, Andrew Hoegh, Raina Plowright
 date: "`r format(Sys.time(), '%Y %B %d')`"
 output: 
    pdf_document: 
@@ -11,6 +11,11 @@ latex_engine: pdflatex
 bibliography: bibliography.bib
 ---
 
+#### Executive Summary:
+
+
+
+\newpage
 
 ```{r, include = F}
 library(tidyverse)
@@ -20,18 +25,31 @@ library(tidyverse)
 
 SARS-CoV-2 can spread quickly through a college campus, posing a threat to students, faculty, and staff. We simulate an outbreak of SARS-CoV-2 on a university campus using a compartmental susceptible exposed infectious recovered (SEIR) model. We explore the implementation of rapid, repeated, widespread screening for SARS-CoV-2 using a novel loop-mediated isothermal amplification (LAMP) assay. We examine the influence of the number of tests deployed, the frequency of testing, and the sensitivity of tests on the overall epidemic size. We also track the demand on capacity (e.g., confirmatory PCR testing, staff, isolation rooms) given different testing scenarios. Next, we will refine our parameter values to reflect an outbreak at Montana State University and will integrate pooled testing approaches into the SEIR models.
 
-\section{Introduction \label{introduction}}
+\section{1. Introduction \label{introduction}}
 We explore the implementation of an inexpensive, rapid, scalable COVID-19 test on the Montana State University campus. Reverse-transcription loop-mediated isothermal amplification (RT-LAMP), is new technology that can detect viruses in saliva with minimal reagents and equipment. Results can take less than 30 minutes and can be sensitive (>90\%) and specific (>98\%).  We simulate the widespread and frequent screening of students at MSU with LAMP to assess the optimal magnitude and frequency of testing required to control an outbreak of SARS-CoV-2 during spring semester. We assume that LAMP testing is a part of a suite of mitigation strategies including mask wearing, social distancing, and hygiene. We also assume that LAMP surveillance is employed concurrently with diagnostic PCR for symptomatic students and that infected students identified during LAMP surveillance are isolated, and that their contacts are traced and quarantined with varying levels of compliance. Future work will integrate pooling scenarios into the LAMP testing framework. 
 Symptomatic screening on MSU campus during fall semester, with associated tracing and isolation, was unable to stop the spread of SARS-CoV-2 on campus. Given that over 50\% of students are likely to be asymptomatic (Denny et al. 2020 Duke Surveillance), a substantial proportion of infected students at MSU were not identified with symptomatic testing and probably contributed to the epidemic that led to over 1,193 detected cases of COVID-19 on campus. 
 Here we provide initial model output from simulations of frequent, rapid screening of students with LAMP.
 
-\subsection{Surveillance and Testing on College Campuses}
-Numerous other college campuses have implemented
+\section{2. Testing Strategies}
+\subsection{2.1 Surveillance and Testing on College Campuses}
+Numerous other college campuses have implemented testing and asymptomatic surveillance plans. We provide a brief overview of the salient details from select colleges and summarize the effectiveness of those plans.
 
 \subsubsection{Synthetic College Population}
 @larremore2020test show that frequent testing, even with lower sensitivity (in terms of detection) can effectively drive epidemics to extinction. The major takeaway point was that testing frequency, and not test sensitivity, was the primary driver of controlling epidemics.
 
 \subsubsection{University of Colorado Boulder}
+
+\begin{itemize}
+\item Initial PCR (Polymerase Chain Reaction) testing for fall move-in/return to campus of approximately 9,000 individuals, giving priority to higher risk areas and populations. This will help identify and quickly isolate positive cases among those returning to campus.
+
+\item Ongoing monitoring/testing. Pooled testing is one of multiple strategies the campus is exploring to provide the greatest ability to detect the early presence of COVID-19 in large populations. Weekly testing is required for on campus students.
+
+\item CU Boulder faculty, staff and students with a Buff OneCard can bring their immediate family/members of their household to participate in the campus surveillance monitoring program. All participants must be asymptomatic and arrive at the testing site accompanied by their immediate family/member of their household with a Buff OneCard.
+
+CU Boulder had a total of 1577 positive on campus tests.
+
+\end{itemize}
+
 \subsubsection{Duke University}
 Duke University (@duke) implemented the "Duke Compact" which among other things included:
 
@@ -49,8 +67,41 @@ From August 2 to October 11, Duke tested nearly 70,000 specimens (using pooled t
 \subsubsection{University of Notre Dame}
 \subsubsection{University of Illinois Urbana Champaign}
 
+\begin{itemize}
+\item The University of Illinois Urbana Champaign (UIUC) developed the shield saliva test that costs about 20 - 30 dollars and results can be returned in about 6 to 12 hours. 
+\item All university faculty, staff and students participating in any on-campus activities are required to participate in the on-campus COVID-19 testing program.
 
-\section{Comparing Model Output to empirical
+\item If you are working on-campus, attending in-person classes or participating in any on-campus activities, you will need to participate in the on-campus testing program.
+
+\item All students living on-campus or residing in Champaign, Urbana, or Savoy must test, even if they are taking a fully online schedule.
+
+\item All faculty, staff and graduate students should move from a once-per-week test schedule to a twice-per-week test schedule. Continue testing at this frequency until notified otherwise.
+
+\item You must continue your twice-per-week test schedule. You can choose Monday-Thursday, Tuesday-Friday, or Wednesday-Saturday/Sunday, schedules. Undergraduate students must still show a Wellness Support Associate their Safer Illinois app or Boarding Pass at building entrances.
+\end{itemize}
+
+UIUC had a total of about 4000 confirmed positive cases from July 6 to November 22.
+
+\subsubsection{A note of comparison}
+
+When comparing the total number cases at a school like CU Boulder or UIUC with Montana State there is an important consideration. Schools that are screening asymptomatic students at a regular frequency are likely to catch all or most of the cases on campus. At many of these colleges, the proportion of asymptomatic cases are roughly 50%, so it is likely that the total number of cases on campus is about twice as large as the numbers reported through the Gallatin County Health Department.
+
+
+\subsection{2.2 Testing Plans at MSU}
+
+We propose a set of scenarios to consider and evaluate in the context of epidemiological models.
+
+\begin{enumerate}
+  \item Same as Fall 2020: testing for symptomatic students
+  \item Campus re-entry screening required for all students or students on campus
+  \item Minimal asymtomatic surveillance screening
+  \item Extensive, high frequency asymtomatic surveillance screening (pooled testing)
+  \item Minimal asymtomatic surveillance screening + re-entry screening
+  \item Extensive, high frequency asymtomatic surveillance screening (pooled testing) + re-entry screening
+\end{enumerate}
+
+\section{3. Modeling}
+\subsection{3.1 Comparing Model Output to empirical
  data from
 MSU \label{comparison-of-symptomatic-cases-in-model-to-empirical-cumulative-data-from-msu}}
 We collected cumulative case counts (weekly) from the Gallatin County Department of Health \cite{healthy_gallatin_2020}. These data were assumed to be the aggregated totals of symptomatic students associated with Montana State University, as asymptomatic students are unlikely to seek care. We compared these counts to the output of a susceptible-exposed-infected-recovered (SEIR)compartment model of a potential outbreak on campus. The conditions for the 200 simulations[\ref{fig:days}] assumed that 75\% of students comply with behavioral controls post-testing or contact tracing, 50\% of students with symptoms seek a test, a mean of 5 contacts can be traced per positive case - 20\% symptomatic, 80\% asymptomatic, there is a 1 day delay in action on contact tracing and there is no asymptomatic testing, there are 50 infectious introductions, 15\% of Students are immune (recovered or otherwise), R0 is 2.6, RE is 2.6*0.85, or 2.21, PCR has perfect sensitivity and specificity.
@@ -63,7 +114,7 @@ This is not a truly “fit” model, instead we have chosen reasonable estimates
 \label{fig:days}
 \end{figure}
 
-\section{Testing frequency, not testing sensitivity, is the major
+\subsection{3.2 Testing frequency, not testing sensitivity, is the major
 driver of epidemic
 size \label{testing-frequency-not-testing-sensitivity-is-the-major-driver-of-epidemic-size}}
 The sensitivity and specificity of LAMP vs. the current standard, qPCR, has been evaluated. While initial estimates of sensitivity and specificity are encouraging (around 92.5\% and 98\%, respectively), the efficacy of LAMP as a diagnostic vs. surveillance tool is not known. LAMP, as the scales discussed below, may allow for public health officials to identify far more positive cases that would be possible if relying on symptomatic students seeking a diagnostic qPCRtest. However, the lower sensitivity of LAMP than qPCR (meaning that false-negatives are more frequent), could affect the effectiveness of LAMP as a screening tool. We evaluated increasing test frequency versus increasing test sensitivity within the SEIR model. 
@@ -73,14 +124,14 @@ For the following and all below simulations, we assumed that 100\% of students c
 The number of LAMP tests per day (the faceting value across the top of figure \ref{fig:dynamite}) was more important than the sensitivity of the LAMP test in driving the total size of an epidemic. Increasing the number of tests available, and increasing the frequency of testing, is more important than increasing the sensitivity of LAMP alone. 
 
 ```{r, fig.cap = "Figure created directly from R code", fig.width = 6, fig.height = 4, echo = F}
-df <- data.frame(day = seq(18, by = 7, length.out = 11), 
-                 new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265),
-                 cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990))
+df <- data.frame(day = seq(18, by = 7, length.out = 12), 
+                 new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265,203),
+                 cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990,1193))
 
 df %>% ggplot(aes(x = day, y = cumulative_MSU_cases)) + 
   geom_point() + theme_bw() + 
   ylab("Cumulative MSU COVID-19 Cases") +
-  labs(title = "Reported MSU COVID-19 Cases", caption = 'source: Gallatin county health department ')
+  labs(title = "Reported MSU COVID-19 Cases", caption = 'source: Gallatin county health department ') + geom_line()
 
 ```
 
@@ -91,7 +142,7 @@ df %>% ggplot(aes(x = day, y = cumulative_MSU_cases)) +
 \label{fig:dynamite}
 \end{figure}
 
-\section{High testing frequency reduces epidemic size and
+\subsection{3.3 High testing frequency reduces epidemic size and
 consequently reduces PCR
 demand \label{high-testing-frequency-reduces-epidemic-size-and-consequently-reduces-pcr-demand.}}
 
@@ -107,7 +158,7 @@ In general, LAMP identifies cases which would otherwise go undetected if testing
 \label{fig:pcr}
 \end{figure}
 
-\section{The total number of missed cases is driven by prevalence
+\subsection{3.4 The total number of missed cases is driven by prevalence
 and testing
 frequency \label{the-total-number-of-missed-cases-is-driven-by-prevalence-and-testing-frequency}}
 
@@ -121,7 +172,7 @@ We considered scenarios of 100-4000 LAMP tests per day with LAMP sensitivity ran
 \label{fig:cases}
 \end{figure}
 
-\section{next steps \label{next steps}}
+\subsection{3.5 next steps \label{next steps}}
 
 For next steps we will: 1) refine the parameter space using data from case counts on university campuses; 2) incorporate parameters that reflect later-stage epidemics with some herd immunity; 3) consider scenarios of delayed LAMP implementation; 4) include variations in the method of LAMP testing (e.g., daily vs. bi-weekly testing, LAMP as a diagnostic, etc.); integrate pooling approaches into the model that are optimized for the stage of epidemic. 
 
