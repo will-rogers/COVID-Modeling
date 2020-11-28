@@ -2,12 +2,17 @@
 
 
 uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt = .8, 
-                    care.seeking = 0.5, R0.on = 3, R0.off = 1.5, test.scenario = c("2 Days","1 Day","No Delay"),
-                    sens.pcr = .99, spec.pcr = .99, 
-                    sens.lamp = c(.8, .9, 1), spec.lamp = .99, lamp.diagnostic = F){
+                    care.seeking = 0.5, R0.on = 3, R0.off = 1.5, 
+                    test.scenario = c("2 Days","1 Day","No Delay"),
+                    sens.pcr = .99, spec.pcr = .99, sens.lamp = c(.8, .9, 1), spec.lamp = .99, 
+                    lamp.diagnostic = F, size.intro.on = 1, prob.into.on =0.1,
+                    size.intro.off = 1, prob.into.off =0.1,
+                    immunity = 0.1, N0 = 16750, on.campus.prop = .25, 
+                    contact.tracing.limit = 100, pooling = 4, pooling.multi = 1,
+                    days = 100, sims = 200, engage.lamp = 7){
   
-  Tsim <- 100        # time to simulate over, we only care about start
-  sims <- 200    # number of simulations
+  Tsim <- as.numeric(days)        # time to simulate over, we only care about start
+  sims <- as.numeric(sims)    # number of simulations
   lamp.diagnostic <- lamp.diagnostic
   ppn_sympt <- as.numeric(ppn_sympt)
   compliance <- as.numeric(compliance)
@@ -21,10 +26,21 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   spec.lamp <- as.numeric(spec.lamp)
   R0.on <- as.numeric(R0.on)   
   R0.off <- as.numeric(R0.off)
+  contact.tracing.limit <- as.numeric(contact.tracing.limit)
+  pooling <- as.numeric(pooling)
+  pooling.multi <- as.numeric(pooling.multi)
+  immunity <- as.numeric(immunity)
+  N0 <- as.numeric(N0)
+  on.campus.prop <- as.numeric(on.campus.prop)
+  size.intro.on <- as.numeric(size.intro.on)
+  prob.into.on <- as.numeric(prob.into.on)
+  size.intro.off <- as.numeric(size.intro.off)
+  prob.into.off <- as.numeric(prob.into.off)
+  engage.lamp <- as.numeric(engage.lamp)
   
   # storage vectors
-  RE.on <- R0.on*.85  # RE assuming some fraction of population is already immune
-  RE.off <- R0.off*.85
+  RE.on <- R0.on*(1-immunity)  # RE assuming some fraction of population is already immune
+  RE.off <- R0.off*(1-immunity) # make argument !!!!!!!!!!!
   beta.normal.on <- RE.on * (1/9)  # calculate Beta
   beta.normal.off <- RE.off * (1/9)  # calculate Beta
   # beta.outbreak <- RE * (1/9) * (1-distancing_reduction)   # calculate Beta
@@ -37,11 +53,11 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   # storage 
   inf.on <- matrix(NA,Tsim,sims)  # storage for infectious class
   case.on <- matrix(NA,Tsim,sims) # storage for daily cases
-  S.on <- matrix(round(6287 * 0.85),1,sims)  # start with 0.85 susceptible
+  S.on <- matrix(round(N0 * on.campus.prop * (1-immunity)),1,sims)  # start with 0.85 susceptible # change to variable!!!!!!
   E.on <- matrix(floor(introductions*.25),1,sims)
   I1.on <- matrix(0,1,sims)                 # start with 5 asymptomatic infectious
   I2.on <- matrix(0,1,sims)
-  R.on <- matrix(6287 - S.on,1,sims)
+  R.on <- matrix((N0 * on.campus.prop) - S.on,1,sims) # change to variable!!!!!!
   sympt1.on <- matrix(0,1,sims)
   sympt2.on <- matrix(0,1,sims)
   symptrep.on <- matrix(0,1,sims)
@@ -57,11 +73,11 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   
   inf.off <- matrix(NA,Tsim,sims)  # storage for infectious class
   case.off <- matrix(NA,Tsim,sims) # storage for daily cases
-  S.off <- matrix(round(10478 * 0.85),1,sims)  # start with 0.85 susceptible
+  S.off <- matrix(round(N0 * (1 - on.campus.prop) * (1 - immunity)),1,sims)  # start with 0.85 susceptible # change to variable!!!!!!
   E.off <- matrix(ceiling(introductions*.75),1,sims)
   I1.off <- matrix(0,1,sims)                 # start with 5 asymptomatic infectious
   I2.off <- matrix(0,1,sims)
-  R.off <- matrix(10478 - S.off,1,sims)
+  R.off <- matrix((N0 * (1 - on.campus.prop)) - S.off,1,sims) # change to variable!!!!!!
   sympt1.off <- matrix(0,1,sims)
   sympt2.off <- matrix(0,1,sims)
   symptrep.off <- matrix(0,1,sims)
@@ -84,6 +100,9 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   contact.wait.3 <- array(0,c(1,sims,10))
   contact.wait.2 <- array(0,c(1,sims,10))
   contact.wait.1 <- array(0,c(1,sims,10))
+  
+  intro.on <- rbinom(1, size.intro.on, prob.into.on)
+  intro.off <- rbinom(1, size.intro.off, prob.into.off)
   
   # distancing_reduction <- 0.5 # if trigger is crossed, NPIs are imposed and transmission is reduced by this fraction
   # qi_trigger <- numeric(sims)
@@ -114,12 +133,14 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
                     N.on[ts-1,], sympt1.on[ts-1,], sympt2.on[ts-1,], beta_vec.on, 
                     S.off[ts-1,], E.off[ts-1,], I1.off[ts-1,], I2.off[ts-1,], R.off[ts-1,], 
                     N.off[ts-1,], sympt1.off[ts-1,], sympt2.off[ts-1,], beta_vec.off, 
-                    theta, gamma_I1I2, gamma_I2R, delta.t=1, tests, contacts.on = 7, contacts.off = 7,
+                    theta, gamma_I1I2, gamma_I2R, delta.t=1, tests, contacts.on = 5, contacts.off = 5,
                     ppn_sympt = ppn_sympt, compliance = compliance, care.seeking = care.seeking,
                     atest.wait.3[ts-1,,],atest.wait.2[ts-1,,],atest.wait.1[ts-1,,],
                     contact.wait.3[ts-1,,], contact.wait.2[ts-1,,],contact.wait.1[ts-1,,],
                     test.scenario, sens.pcr = sens.pcr, spec.pcr = spec.pcr, 
-                    sens.lamp = sens.lamp, spec.lamp = spec.lamp, lamp.diagnostic = lamp.diagnostic) # call to SIR step function above
+                    sens.lamp = sens.lamp, spec.lamp = spec.lamp, lamp.diagnostic = lamp.diagnostic,
+                    contact.tracing.limit = contact.tracing.limit, intro.on, intro.off, pooling,
+                    pooling.multi, ts = ts, engage.lamp = engage.lamp) # call to SIR step function above
     S.on <- rbind(S.on,out[,1])  # update state
     E.on <- rbind(E.on,out[,2])  # update state
     I1.on <- rbind(I1.on,out[,3])  # update state
@@ -207,6 +228,19 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
               "spec.pcr" = matrix(spec.pcr,Tsim,sims),
               "sens.lamp" = matrix(sens.lamp,Tsim,sims),
               "spec.lamp" = matrix(spec.lamp,Tsim,sims),
-              "lamp.diagnostic" = matrix(lamp.diagnostic,Tsim,sims)
+              "lamp.diagnostic" = matrix(lamp.diagnostic,Tsim,sims),
+              "size.intro.on" = matrix(size.intro.on,Tsim,sims), 
+              "prob.into.on" = matrix(prob.into.on,Tsim,sims),
+              "size.intro.off" = matrix(size.intro.off,Tsim,sims), 
+              "prob.into.off" = matrix(prob.into.off,Tsim,sims),
+              "immunity" = matrix(immunity,Tsim,sims), 
+              "N0" = matrix(N0,Tsim,sims), 
+              "on.campus.prop" = matrix(on.campus.prop,Tsim,sims), 
+              "contact.tracing.limit" = matrix(contact.tracing.limit,Tsim,sims), 
+              "pooling" = matrix(pooling,Tsim,sims), 
+              "pooling.multi" = matrix(pooling.multi,Tsim,sims),
+              "days" = matrix(days,Tsim,sims), 
+              "sims" = matrix(sims,Tsim,sims), 
+              "engage.lamp" = matrix(engage.lamp,Tsim,sims)
               ))
 }
