@@ -27,7 +27,6 @@
 #compliance is a proportion of confirmed asymptomatic tests or their contacts who either fail to 
 # show for testing or dont comply with isolation
 #care.seeking is the proportion of students who seek care once symptomatic
-# browser()
 
 sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on, newSympt2.on, beta_vec.on = beta_vec.on,
                       S.off,E.off,I1.off,I2.off,R.off,N.off,newSympt1.off, newSympt2.off, beta_vec.off = beta_vec.off, 
@@ -36,7 +35,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                       atest.wait.3,atest.wait.2,atest.wait.1,contact.wait.3,contact.wait.2,contact.wait.1,
                       test.scenario = c("2 Days","1 Day","No Delay"), sens.pcr = .99, spec.pcr = .99, 
                       sens.lamp = .8, spec.lamp = .99, lamp.diagnostic = F, contact.tracing.limit = 100, 
-                      intro.on, intro.off, pooling, pooling.multi, ts, engage.lamp) {
+                      intro.on, intro.off, pooling, pooling.multi) {
   ts <- ts
   dN_SE.on <- rbinom(n=sims,size=S.on,
                      prob=1-exp(-beta_vec.on*(I1.on+I2.on+I1.off+I2.off)/(N.on+N.off)*delta.t)) + intro.on # add random introductions
@@ -83,14 +82,8 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                 S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_I1I2.off ) # assume that I1->I2 is when cases become detectable
   sympt.pcr <- newSymptReportedTrue.on + newSymptReportedTrue.off
   
-  if (engage.lamp < ts) {
-    atests <- rmultinomial(sims,0,out[,c(1:5,7:11)])
-    tested. <- atests
-    avail.tests <- 0
-  }
-  
-  if (engage.lamp >= ts) {
-    avail.tests <- tests * pooling
+  avail.tests <- tests * pooling
+    
     atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
     tested <- atests
     for (i in 1:sims){
@@ -104,8 +97,9 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
       }
     }
     
+    asymp.pcr <- rep(0, sims)
+    
     tested. <- tested
-  
     if (lamp.diagnostic == F) {
       for (i in 1:sims){
         for (j in 1:10){
@@ -117,11 +111,12 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
           }
         }
       }
+      asymp.pcr <- apply(tested., 1, sum)
     }
-  }
-  missed.cases <- apply(atests[,c(3,4,8,9)] - tested.[,c(3,4,8,9)], 1, sum)
   
-  asymp.pcr <- apply(tested., 1, sum)
+    
+  missed.cases <- apply(atests[,c(3,4,8,9)] - tested.[,c(3,4,8,9)], 1, sum)
+
   
   sympt.isolate <- matrix(0,nr=sims,nc=10) # storage for symptomatic cases to isolate
   sympt.isolate[,c(4)] <- newSymptReported.on
@@ -183,7 +178,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
     if (sum(tot.contacts[i,]) == 0 ) next
     contacts[i,] <- rmultinomial(1,contact.tracing.limit,tot.contacts[i,])
   }
-  
+
   contact.wait.3 <- sir_simple_step(contact.wait.2,sims,
                                     I1.on, I2.on, I1.off, I2.off, N.on, N.off,
                                     theta, gamma_I1I2, gamma_I2R,

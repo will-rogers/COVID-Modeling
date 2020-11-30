@@ -19,6 +19,20 @@ bibliography: bibliography.bib
 
 ```{r, include = F}
 library(tidyverse)
+### Running files 
+setwd("~/Downloads/Research/COVID-19/LAMP/COVID-Modeling")
+
+# Always rerun these if you edit the source file
+source("sir_lamp_function.R")
+source("sir_simple_step_function.R")
+source("uni_sim_function.R")
+source("uni_sim_par_function.R")
+source("plotting_functions.R")
+
+# These are good to have on hand
+library(data.table)
+library(mc2d)
+library(abind)
 ```
 
 #### Abstract:
@@ -26,9 +40,40 @@ library(tidyverse)
 SARS-CoV-2 can spread quickly through a college campus, posing a threat to students, faculty, and staff. We simulate an outbreak of SARS-CoV-2 on a university campus using a compartmental susceptible exposed infectious recovered (SEIR) model. We explore the implementation of rapid, repeated, widespread screening for SARS-CoV-2 using a novel loop-mediated isothermal amplification (LAMP) assay. We examine the influence of the number of tests deployed, the frequency of testing, and the sensitivity of tests on the overall epidemic size. We also track the demand on capacity (e.g., confirmatory PCR testing, staff, isolation rooms) given different testing scenarios. Next, we will refine our parameter values to reflect an outbreak at Montana State University and will integrate pooled testing approaches into the SEIR models.
 
 \section{1. Introduction \label{introduction}}
-We explore the implementation of an inexpensive, rapid, scalable COVID-19 test on the Montana State University campus. Reverse-transcription loop-mediated isothermal amplification (RT-LAMP), is new technology that can detect viruses in saliva with minimal reagents and equipment. Results can take less than 30 minutes and can be sensitive (>90\%) and specific (>98\%).  We simulate the widespread and frequent screening of students at MSU with LAMP to assess the optimal magnitude and frequency of testing required to control an outbreak of SARS-CoV-2 during spring semester. We assume that LAMP testing is a part of a suite of mitigation strategies including mask wearing, social distancing, and hygiene. We also assume that LAMP surveillance is employed concurrently with diagnostic PCR for symptomatic students and that infected students identified during LAMP surveillance are isolated, and that their contacts are traced and quarantined with varying levels of compliance. Future work will integrate pooling scenarios into the LAMP testing framework. 
+We explore the implementation of an inexpensive, rapid, scalable COVID-19 test on the Montana State University campus. Reverse-transcription loop-mediated isothermal amplification (RT-LAMP), is new technology that can detect viruses in saliva with minimal reagents and equipment. Results can take less than 45 minutes and can be sensitive (>90\%) and specific (>98\%).  We simulate the widespread and frequent screening of students at MSU with LAMP to assess the optimal magnitude and frequency of testing required to control an outbreak of SARS-CoV-2 during spring semester. We assume that LAMP testing is a part of a suite of mitigation strategies including mask wearing, social distancing, and hygiene. We also assume that LAMP surveillance is employed concurrently with diagnostic PCR for symptomatic students and that infected students identified during LAMP surveillance are isolated, and that their contacts are traced and quarantined with varying levels of compliance. Future work will integrate pooling scenarios into the LAMP testing framework. 
 Symptomatic screening on MSU campus during fall semester, with associated tracing and isolation, was unable to stop the spread of SARS-CoV-2 on campus. Given that over 50\% of students are likely to be asymptomatic (Denny et al. 2020 Duke Surveillance), a substantial proportion of infected students at MSU were not identified with symptomatic testing and probably contributed to the epidemic that led to over 1,193 detected cases of COVID-19 on campus. 
 Here we provide initial model output from simulations of frequent, rapid screening of students with LAMP.
+
+```{r}
+set.seed(12345)
+output <- uni_sims_par(tst = c(0,250,500,1000,2000,4000), 
+                       tst.timeline = c("Initial", "Sustained", "Both"),
+                       compliance = c(0.75,1), # worst-best
+                       init.prev = c(0,0.005,0.05), # best-mid-worst
+                       ppn_sympt = c(0.2, 0.5), # best-worst
+                       care.seeking = c(0.5,1), # worst-best
+                       R0.on = c(2.5, 2.75, 3),  # best-mid-worst
+                       R0.off = c(2.5, 2.75, 3), # best-mid-worst
+                       test.scenario = c("No Delay","2 Days"),# best-worst
+                       sens.pcr = 1, # for all intents this is reasonable
+                       spec.pcr = 1, # for all intents this is reasonable
+                       sens.lamp = c(0.85, 0.90, 0.95), # bad day/lab to good day/lab
+                       spec.lamp = .99, # not dynamic yet
+                       lamp.diagnostic = c(F,T), # will affect PCR demand
+                       community.intro.daily.on = 1, 
+                       community.prob.daily.on = c(0.1,.5, 1), # every ten, 2, or 1 days
+                       community.intro.daily.off = 1, 
+                       community.prob.daily.off = c(0.1,.5, 1), # every ten, 2, or 1 days
+                       immunity = c(0.08358, 0.4179), # based on Fall 20 symptm, extrapolation to total
+                       N0 = 16750, #campus pop
+                       on.campus.prop = .25, #on/off division, only matters if we change on/off characteristics
+                       contact.tracing.limit = c(0,50,100), # limit on number of contact traces per day
+                       pooling = c(1,4,8), 
+                       pooling.multi = c(1,.5,.25), #is the effect of pooling on accuracy 1:1, or do added pools only reduce sensitivity slightly?
+                       days = 150, #simulation days
+                       sims = 50, # number of simulations
+                       ncores=NULL)
+```
 
 \section{2. Testing Strategies}
 \subsection{2.1 Surveillance and Testing on College Campuses}

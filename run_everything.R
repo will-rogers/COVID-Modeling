@@ -1,13 +1,6 @@
 ### Running files 
 setwd("~/Downloads/Research/COVID-19/LAMP/COVID-Modeling")
 
-# Always rerun these if you edit the source file
-source("sir_lamp_function.R")
-source("sir_simple_step_function.R")
-source("uni_sim_function.R")
-source("uni_sim_par_function.R")
-source("plotting_functions.R")
-
 # These are good to have on hand
 library(ggplot2)
 library(dplyr)
@@ -15,50 +8,40 @@ library(data.table)
 library(mc2d)
 library(abind)
 
-set.seed(12345)
-output <- uni_sims_par(tst = 500, 
-                       compliance = 0.75, 
-                       introductions = 5, 
-                       ppn_sympt = .8, 
-                       care.seeking = 0.5, 
-                       R0.on = 3,  R0.off = 1.5, 
-                       test.scenario = c("No Delay"),
-                       sens.pcr = .99, spec.pcr = .99, 
-                       sens.lamp = c(1), spec.lamp = .99, 
-                       lamp.diagnostic = F, 
-                       size.intro.on = 1, prob.into.on =0.1,
-                       size.intro.off = 1, prob.into.off =0.1,
-                       immunity = 0.1, 
-                       N0 = 16750, 
-                       on.campus.prop = .25, 
-                       contact.tracing.limit = 100,
-                       pooling = 4, pooling.multi = 1,
-                       days = 300, sims = 5,
-                       engage.lamp = 25,
-                       ncores=NULL)
-
-output$lamp.diagnostic.f <- factor(output$lamp.diagnostic, levels = c("FALSE", "TRUE"), labels = c("PCR Conf.", "LAMP Diag."))
-out <- output %>% 
-  group_by(group) %>% 
-  mutate(cum.cases.on = cumsum(new.cases.on),
-         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
-         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
-         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
-         cum.cases.off = cumsum(new.cases.off),
-         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
-         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
-         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
-         cum.sum.missed = cumsum(missed.pcr),
-         pcr.demand = cumsum(symp.pcr) + cumsum(asymp.pcr)
-  )
-
-write.csv(out, "comparison.csv")
+# Always rerun these if you edit the source file
+source("sir_lamp_function.R")
+source("sir_simple_step_function.R")
+source("uni_sim_function.R")
+source("uni_sim_par_function.R")
+source("plotting_functions.R")
 
 set.seed(12345)
-output <- uni_sims_par(tests=c(0,100,250,500,1000,2000,3000,4000), compliance=1, introductions = 50, 
-                       ppn_sympt = 0.2, care.seeking = 1, R0.on = 2.6, R0.off = 2.6, 
-                       test.scenario = c("1 Day"), sens.pcr = c(1), spec.pcr = 1,
-                       sens.lamp = c(.8,.85,.9,.95,1), spec.lamp = 1, lamp.diagnostic = c(F),
+output <- uni_sims_par(tst = c(0), 
+                       tst.timeline = c("Initial", "Sustained", "Both"),
+                       compliance = c(0.75), # worst-best
+                       init.prev = c(0.15), # best-mid-worst
+                       ppn_sympt = c(0.2), # best-worst
+                       care.seeking = c(0.5), # worst-best
+                       R0.on = c(2.5),  # best-mid-worst
+                       R0.off = c(2.5), # best-mid-worst
+                       test.scenario = c("No Delay"),# best-worst
+                       sens.pcr = 1, # for all intents this is reasonable
+                       spec.pcr = 1, # for all intents this is reasonable
+                       sens.lamp = c(0.85), # bad day/lab to good day/lab
+                       spec.lamp = .99, # not dynamic yet
+                       lamp.diagnostic = c(F), # will affect PCR demand
+                       community.intro.daily.on = 1, 
+                       community.prob.daily.on = c(0.1), # every ten, 2, or 1 days
+                       community.intro.daily.off = 1, 
+                       community.prob.daily.off = c(0.1), # every ten, 2, or 1 days
+                       immunity = c(0.08358), # based on Fall 20 symptm, extrapolation to total
+                       N0 = 16750, #campus pop
+                       on.campus.prop = .25, #on/off division, only matters if we change on/off characteristics
+                       contact.tracing.limit = c(0), # limit on number of contact traces per day
+                       pooling = c(1), 
+                       pooling.multi = c(1), #is the effect of pooling on accuracy 1:1, or do added pools only reduce sensitivity slightly?
+                       days = 100, #simulation days
+                       sims = 50, # number of simulations
                        ncores=NULL)
 
 output$lamp.diagnostic.f <- factor(output$lamp.diagnostic, levels = c("FALSE", "TRUE"), labels = c("PCR Conf.", "LAMP Diag."))

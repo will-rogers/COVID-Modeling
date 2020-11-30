@@ -1,15 +1,18 @@
 #### University Simulation Functions
 
 
-uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt = .8, 
+uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both"),
+                    compliance = 0.75, init.prev = .03, ppn_sympt = .8, 
                     care.seeking = 0.5, R0.on = 3, R0.off = 1.5, 
                     test.scenario = c("2 Days","1 Day","No Delay"),
                     sens.pcr = .99, spec.pcr = .99, sens.lamp = c(.8, .9, 1), spec.lamp = .99, 
-                    lamp.diagnostic = F, size.intro.on = 1, prob.into.on =0.1,
-                    size.intro.off = 1, prob.into.off =0.1,
+                    lamp.diagnostic = F, community.intro.daily.on = 1, 
+                    community.prob.daily.on = 0.1,
+                    community.intro.daily.off = 1, 
+                    community.prob.daily.off = 0.1,
                     immunity = 0.1, N0 = 16750, on.campus.prop = .25, 
                     contact.tracing.limit = 100, pooling = 4, pooling.multi = 1,
-                    days = 100, sims = 200, engage.lamp = 7){
+                    days = 100, sims = 200){
   
   Tsim <- as.numeric(days)        # time to simulate over, we only care about start
   sims <- as.numeric(sims)    # number of simulations
@@ -17,7 +20,7 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   ppn_sympt <- as.numeric(ppn_sympt)
   compliance <- as.numeric(compliance)
   care.seeking <- as.numeric(care.seeking) 
-  introductions <- as.numeric(introductions)
+  init.prev <- as.numeric(init.prev)
   tst <- as.numeric(tst)
   test.scenario <- test.scenario
   sens.pcr <- as.numeric(sens.pcr)
@@ -32,11 +35,10 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   immunity <- as.numeric(immunity)
   N0 <- as.numeric(N0)
   on.campus.prop <- as.numeric(on.campus.prop)
-  size.intro.on <- as.numeric(size.intro.on)
-  prob.into.on <- as.numeric(prob.into.on)
-  size.intro.off <- as.numeric(size.intro.off)
-  prob.into.off <- as.numeric(prob.into.off)
-  engage.lamp <- as.numeric(engage.lamp)
+  community.intro.daily.on <- as.numeric(community.intro.daily.on)
+  community.prob.daily.on <- as.numeric(community.prob.daily.on)
+  community.intro.daily.off <- as.numeric(community.intro.daily.off)
+  community.prob.daily.off <- as.numeric(community.prob.daily.off)
   
   # storage vectors
   RE.on <- R0.on*(1-immunity)  # RE assuming some fraction of population is already immune
@@ -54,10 +56,10 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   inf.on <- matrix(NA,Tsim,sims)  # storage for infectious class
   case.on <- matrix(NA,Tsim,sims) # storage for daily cases
   S.on <- matrix(round(N0 * on.campus.prop * (1-immunity)),1,sims)  # start with 0.85 susceptible # change to variable!!!!!!
-  E.on <- matrix(floor(introductions*.25),1,sims)
+  E.on <- matrix(floor(N0 * init.prev * on.campus.prop * (1-immunity)),1,sims)
   I1.on <- matrix(0,1,sims)                 # start with 5 asymptomatic infectious
   I2.on <- matrix(0,1,sims)
-  R.on <- matrix((N0 * on.campus.prop) - S.on,1,sims) # change to variable!!!!!!
+  R.on <- matrix((N0 * on.campus.prop * immunity) ,1,sims) # change to variable!!!!!!
   sympt1.on <- matrix(0,1,sims)
   sympt2.on <- matrix(0,1,sims)
   symptrep.on <- matrix(0,1,sims)
@@ -74,10 +76,10 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   inf.off <- matrix(NA,Tsim,sims)  # storage for infectious class
   case.off <- matrix(NA,Tsim,sims) # storage for daily cases
   S.off <- matrix(round(N0 * (1 - on.campus.prop) * (1 - immunity)),1,sims)  # start with 0.85 susceptible # change to variable!!!!!!
-  E.off <- matrix(ceiling(introductions*.75),1,sims)
+  E.off <- matrix(floor(N0 * init.prev * (1 - on.campus.prop) * (1-immunity)),1,sims)
   I1.off <- matrix(0,1,sims)                 # start with 5 asymptomatic infectious
   I2.off <- matrix(0,1,sims)
-  R.off <- matrix((N0 * (1 - on.campus.prop)) - S.off,1,sims) # change to variable!!!!!!
+  R.off <- matrix((N0 * (1 - on.campus.prop) * immunity),1,sims)
   sympt1.off <- matrix(0,1,sims)
   sympt2.off <- matrix(0,1,sims)
   symptrep.off <- matrix(0,1,sims)
@@ -101,33 +103,30 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
   contact.wait.2 <- array(0,c(1,sims,10))
   contact.wait.1 <- array(0,c(1,sims,10))
   
-  intro.on <- rbinom(1, size.intro.on, prob.into.on)
-  intro.off <- rbinom(1, size.intro.off, prob.into.off)
+  intro.on <- rbinom(1, community.intro.daily.on, community.prob.daily.on)
+  intro.off <- rbinom(1, community.intro.daily.off, community.prob.daily.off)
   
   # distancing_reduction <- 0.5 # if trigger is crossed, NPIs are imposed and transmission is reduced by this fraction
   # qi_trigger <- numeric(sims)
   
   for(ts in 2:Tsim){
-    # if (test.scenario == "FL") {
-    #   if(ts <= 20) {
-    #     tests <- tst*3
-    #   }
-    #   if(ts >20) {
-    #     tests <- ((tst*Tsim)-(tst*3*20))/80
-    #   }
-    # }
-    # if (test.scenario == "RL") {
-    #   if(ts < 80) {
-    #     tests <- ((tst*Tsim)-(tst*3*20))/80
-    #   }
-    #   if(ts >= 80) {
-    #     tests <- tst*3
-    #   }
-    # }
-    # if (test.scenario == "NP") {
-    #   tests <- tst
-    # }
-    tests <- tst
+    if(test.timeline == "Initial" & ts > 20){
+      tests = 0
+    }
+    if(test.timeline == "Initial" & ts <= 20){
+      tests = floor(5*tst) 
+    }
+    
+    if(test.timeline == "Sustained"){
+      tests = floor(tst)
+    }
+    
+    if(test.timeline == "Both" & ts > 20){
+      tests = floor(tst*2.5)
+    }
+    if(test.timeline == "Both" & ts <= 20){
+      tests = floor(tst*0.625)
+    }
     out <- sir_lamp(sims, 
                     S.on[ts-1,], E.on[ts-1,], I1.on[ts-1,], I2.on[ts-1,], R.on[ts-1,], 
                     N.on[ts-1,], sympt1.on[ts-1,], sympt2.on[ts-1,], beta_vec.on, 
@@ -140,7 +139,7 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
                     test.scenario, sens.pcr = sens.pcr, spec.pcr = spec.pcr, 
                     sens.lamp = sens.lamp, spec.lamp = spec.lamp, lamp.diagnostic = lamp.diagnostic,
                     contact.tracing.limit = contact.tracing.limit, intro.on, intro.off, pooling,
-                    pooling.multi, ts = ts, engage.lamp = engage.lamp) # call to SIR step function above
+                    pooling.multi) # call to SIR step function above
     S.on <- rbind(S.on,out[,1])  # update state
     E.on <- rbind(E.on,out[,2])  # update state
     I1.on <- rbind(I1.on,out[,3])  # update state
@@ -217,9 +216,8 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
               "missed.pcr" = missed.pcr,
               "tests"= matrix(tst,Tsim,sims),
               "compliance" = matrix(compliance,Tsim,sims),
-              "introductions"= matrix(introductions,Tsim,sims),
+              "init.prev"= matrix(init.prev,Tsim,sims),
               "ppn_sympt"= matrix(ppn_sympt,Tsim,sims),
-              # 'thresh'= matrix(thresh,Tsim,sims),
               'care.seeking'= matrix(care.seeking,Tsim,sims),
               "R0.on" = matrix(R0.on,Tsim,sims),
               "R0.off" = matrix(R0.off,Tsim,sims),
@@ -229,10 +227,10 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
               "sens.lamp" = matrix(sens.lamp,Tsim,sims),
               "spec.lamp" = matrix(spec.lamp,Tsim,sims),
               "lamp.diagnostic" = matrix(lamp.diagnostic,Tsim,sims),
-              "size.intro.on" = matrix(size.intro.on,Tsim,sims), 
-              "prob.into.on" = matrix(prob.into.on,Tsim,sims),
-              "size.intro.off" = matrix(size.intro.off,Tsim,sims), 
-              "prob.into.off" = matrix(prob.into.off,Tsim,sims),
+              "community.intro.daily.on" = matrix(community.intro.daily.on,Tsim,sims), 
+              "community.prob.daily.on" = matrix(community.prob.daily.on,Tsim,sims),
+              "community.intro.daily.off" = matrix(community.intro.daily.off,Tsim,sims), 
+              "community.prob.daily.off" = matrix(community.prob.daily.off,Tsim,sims),
               "immunity" = matrix(immunity,Tsim,sims), 
               "N0" = matrix(N0,Tsim,sims), 
               "on.campus.prop" = matrix(on.campus.prop,Tsim,sims), 
@@ -240,7 +238,7 @@ uni_sim <- function(tst = 500, compliance = 0.75, introductions = 5, ppn_sympt =
               "pooling" = matrix(pooling,Tsim,sims), 
               "pooling.multi" = matrix(pooling.multi,Tsim,sims),
               "days" = matrix(days,Tsim,sims), 
-              "sims" = matrix(sims,Tsim,sims), 
-              "engage.lamp" = matrix(engage.lamp,Tsim,sims)
+              "sims" = matrix(sims,Tsim,sims),
+              "test.timeline" = test.timeline
               ))
 }
