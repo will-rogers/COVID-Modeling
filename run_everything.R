@@ -7,6 +7,7 @@ library(dplyr)
 library(data.table)
 library(mc2d)
 library(abind)
+library(pbapply)
 
 # Always rerun these if you edit the source file
 source("sir_lamp_function.R")
@@ -17,30 +18,30 @@ source("plotting_functions.R")
 
 set.seed(12345)
 output <- uni_sims_par(tst = c(0), 
-                       tst.timeline = c("Initial", "Sustained", "Both"),
-                       compliance = c(0.75), # worst-best
-                       init.prev = c(0.15), # best-mid-worst
+                       test.timeline = c("Sustained"),
+                       compliance = c(0.5), # worst-best
+                       init.prev = c(0.002), # best-mid-worst
                        ppn_sympt = c(0.2), # best-worst
-                       care.seeking = c(0.5), # worst-best
-                       R0.on = c(2.5),  # best-mid-worst
-                       R0.off = c(2.5), # best-mid-worst
+                       care.seeking = c(0.3), # worst-best
+                       R0.on = c(2.4),  # best-mid-worst
+                       R0.off = c(2.4), # best-mid-worst
                        test.scenario = c("No Delay"),# best-worst
                        sens.pcr = 1, # for all intents this is reasonable
                        spec.pcr = 1, # for all intents this is reasonable
-                       sens.lamp = c(0.85), # bad day/lab to good day/lab
+                       sens.lamp = c(.9), # bad day/lab to good day/lab
                        spec.lamp = .99, # not dynamic yet
                        lamp.diagnostic = c(F), # will affect PCR demand
                        community.intro.daily.on = 1, 
                        community.prob.daily.on = c(0.1), # every ten, 2, or 1 days
                        community.intro.daily.off = 1, 
                        community.prob.daily.off = c(0.1), # every ten, 2, or 1 days
-                       immunity = c(0.08358), # based on Fall 20 symptm, extrapolation to total
+                       immunity = c(0.0), # based on Fall 20 symptm, extrapolation to total
                        N0 = 16750, #campus pop
                        on.campus.prop = .25, #on/off division, only matters if we change on/off characteristics
                        contact.tracing.limit = c(0), # limit on number of contact traces per day
                        pooling = c(1), 
                        pooling.multi = c(1), #is the effect of pooling on accuracy 1:1, or do added pools only reduce sensitivity slightly?
-                       days = 100, #simulation days
+                       days = 150, #simulation days
                        sims = 50, # number of simulations
                        ncores=NULL)
 
@@ -59,8 +60,22 @@ out <- output %>%
          pcr.demand = cumsum(symp.pcr) + cumsum(asymp.pcr)
   )
 
-write.csv(out, "out.csv")
+# out %>% 
+#   filter(day == max(day)) %>% 
+#   group_by(test.timeline, sens.lamp, init.prev) %>% 
+#   summarize(mean = mean(cum.cases.on+cum.cases.off),
+#                      sd = sd(cum.cases.on+cum.cases.off),
+#                      upper = mean + 1.96*sd,
+#                      lower = mean - 1.96*sd) %>% 
+#   ggplot(aes(x = test.timeline, y = mean, color = test.timeline)) +
+#   geom_point(stat="identity") +
+#   geom_errorbar(aes(ymin = lower, ymax = upper)) +
+#   facet_grid(sens.lamp~init.prev) +
+#   theme_classic()
 
+
+# write.csv(out, "out.csv")
+# 
 # plot <- out %>% 
 #   group_by(day, lamp.diagnostic.f) %>% 
 #   summarize(mean = mean(symp.pcr+asymp.pcr),
@@ -84,13 +99,13 @@ write.csv(out, "out.csv")
 #   geom_errorbar(aes(ymax = upper, ymin = lower)) +
 #   theme_classic()
 # 
-df <- data.frame(day = seq(17, by = 7, length.out = 11),
-                 new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265),
-                 cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990))
+df <- data.frame(day = seq(17, by = 7, length.out = 13),
+                 new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265,203,105),
+                 cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990,1193,1298))
 out %>%
   filter(tests == 0) %>%
   group_by(day) %>%
-  summarize(mean = mean(cum.reporting.symptoms.on+cum.reporting.symptoms.off),
+  summarize(mean = mean(cum.reporting.symptoms.on+cum.reporting.symptoms.off)+0.0025*16750,
                      sd = sd(cum.reporting.symptoms.on+cum.reporting.symptoms.off),
                      upper = mean + 1.96*sd,
                      lower = mean - 1.96*sd) %>%
@@ -185,28 +200,28 @@ out %>%
 #   scale_fill_discrete(name = "LAMP \nSensitivity",
 #                       labels = c("80%","90%","100%")) +
 #   theme_classic()
-
-out %>% 
-  filter(day == max(day)) %>% 
-  group_by(tests, sens.lamp, day) %>%
-  summarize(mean = mean(cum.sum.missed),
-            sd = sd(cum.sum.missed),
-            upper = mean + 1.96*sd,
-            lower = mean - 1.96*sd) %>%
-  ggplot(aes(x = factor(sens.lamp), y = mean, color = factor(sens.lamp), 
-             fill = factor(sens.lamp), group = factor(sens.lamp))) +
-  geom_point() +
-  geom_errorbar(aes(ymax = upper, ymin = lower)) +
-  facet_grid(.~tests) +
-  labs(y="Cumulative Missed Cases \n (95% Of Simulations)",
-       x = "Sensitivity") +
-  scale_color_discrete(name = "LAMP \nSensitivity",
-                       labels = c("80%","85%","90%","95%")) +
-  scale_fill_discrete(name = "LAMP \nSensitivity",
-                      labels = c("80%","85%","90%","95%")) +
-  theme_classic() +
-  theme(axis.ticks.x = element_blank(),
-        axis.text.x = element_blank())
-ggsave("LAMP_missed_cases.png")
+# 
+# out %>% 
+#   filter(day == max(day)) %>% 
+#   group_by(tests, sens.lamp, day) %>%
+#   summarize(mean = mean(cum.sum.missed),
+#             sd = sd(cum.sum.missed),
+#             upper = mean + 1.96*sd,
+#             lower = mean - 1.96*sd) %>%
+#   ggplot(aes(x = factor(sens.lamp), y = mean, color = factor(sens.lamp), 
+#              fill = factor(sens.lamp), group = factor(sens.lamp))) +
+#   geom_point() +
+#   geom_errorbar(aes(ymax = upper, ymin = lower)) +
+#   facet_grid(.~tests) +
+#   labs(y="Cumulative Missed Cases \n (95% Of Simulations)",
+#        x = "Sensitivity") +
+#   scale_color_discrete(name = "LAMP \nSensitivity",
+#                        labels = c("80%","85%","90%","95%")) +
+#   scale_fill_discrete(name = "LAMP \nSensitivity",
+#                       labels = c("80%","85%","90%","95%")) +
+#   theme_classic() +
+#   theme(axis.ticks.x = element_blank(),
+#         axis.text.x = element_blank())
+# ggsave("LAMP_missed_cases.png")
 
 

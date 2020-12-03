@@ -80,10 +80,11 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   
   out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_I1I2.on, 
                 S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_I1I2.off ) # assume that I1->I2 is when cases become detectable
-  sympt.pcr <- newSymptReportedTrue.on + newSymptReportedTrue.off
+  sympt.pcr <- newSymptReported.on + newSymptReported.off
   
   avail.tests <- tests * pooling
     
+  if(0 %in% apply(out[,c(1:5,7:11)],1,sum)) browser()
     atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
     tested <- atests
     for (i in 1:sims){
@@ -178,7 +179,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
     if (sum(tot.contacts[i,]) == 0 ) next
     contacts[i,] <- rmultinomial(1,contact.tracing.limit,tot.contacts[i,])
   }
-
+  
   contact.wait.3 <- sir_simple_step(contact.wait.2,sims,
                                     I1.on, I2.on, I1.off, I2.off, N.on, N.off,
                                     theta, gamma_I1I2, gamma_I2R,

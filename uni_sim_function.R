@@ -185,10 +185,10 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     ####################################################################################
     # Total in Isolation/Qurantine
     isolation.on <- rbind(isolation.on,apply(comply_test_positives.on[(max(1,ts-10)):ts,],2,sum) + apply(symptrep.on[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
-    quarantine.on <- rbind(quarantine.on, apply(new_contacts.on[(max(1,ts-14)):ts,],2,sum) ) # quarantine for 14 days
+    quarantine.on <- rbind(quarantine.on, apply(new_contacts.on[(max(1,ts-10)):ts,],2,sum) ) # quarantine for 14 days
     
     isolation.off <- rbind(isolation.off,apply(comply_test_positives.off[(max(1,ts-10)):ts,],2,sum) + apply(symptrep.off[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
-    quarantine.off <- rbind(quarantine.off, apply(new_contacts.off[(max(1,ts-14)):ts,],2,sum) )
+    quarantine.off <- rbind(quarantine.off, apply(new_contacts.off[(max(1,ts-10)):ts,],2,sum) )
   }
   
   inf.on <- I1.on+I2.on   # total infectious on campus

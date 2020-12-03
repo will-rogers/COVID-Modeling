@@ -2,7 +2,7 @@
 
 
 uni_sims_par <- function(tst = 500, 
-                         tst.timeline = c("Initial", "Sustained", "Both"),
+                         test.timeline = c("Initial", "Sustained", "Both"),
                          compliance = 0.75, 
                          init.prev = .05, 
                          ppn_sympt = .8, 
@@ -43,7 +43,7 @@ uni_sims_par <- function(tst = 500,
                       "pooling" = pooling, 
                       "pooling.multi" = pooling.multi,
                       "days" = days, "sims" = sims,
-                      "test.timeline" = tst.timeline)
+                      "test.timeline" = test.timeline)
   vars <- vars %>%
     filter(R0.on == R0.off)
   if (is.null(ncores)){
@@ -106,7 +106,11 @@ uni_sims_par <- function(tst = 500,
     parallel::stopCluster(cl)
     rm('cl')
   }
-  output[,group:=rep(1:(.N/100),each=100)]
+  sims <- as.numeric(sims)
+  days <- as.numeric(days)
+  leng <- nrow(vars)*sims
+  output[,group:=rep(1:leng,
+                     each=days)]
   output[,compliance:=paste(100*compliance,'%',sep='')]
   output[,tests:=tests]
   output[,ppn_sympt:=ppn_sympt]

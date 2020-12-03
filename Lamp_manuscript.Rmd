@@ -44,37 +44,6 @@ We explore the implementation of an inexpensive, rapid, scalable COVID-19 test o
 Symptomatic screening on MSU campus during fall semester, with associated tracing and isolation, was unable to stop the spread of SARS-CoV-2 on campus. Given that over 50\% of students are likely to be asymptomatic (Denny et al. 2020 Duke Surveillance), a substantial proportion of infected students at MSU were not identified with symptomatic testing and probably contributed to the epidemic that led to over 1,193 detected cases of COVID-19 on campus. 
 Here we provide initial model output from simulations of frequent, rapid screening of students with LAMP.
 
-```{r}
-set.seed(12345)
-output <- uni_sims_par(tst = c(0,250,500,1000,2000,4000), 
-                       tst.timeline = c("Initial", "Sustained", "Both"),
-                       compliance = c(0.75,1), # worst-best
-                       init.prev = c(0,0.005,0.05), # best-mid-worst
-                       ppn_sympt = c(0.2, 0.5), # best-worst
-                       care.seeking = c(0.5,1), # worst-best
-                       R0.on = c(2.5, 2.75, 3),  # best-mid-worst
-                       R0.off = c(2.5, 2.75, 3), # best-mid-worst
-                       test.scenario = c("No Delay","2 Days"),# best-worst
-                       sens.pcr = 1, # for all intents this is reasonable
-                       spec.pcr = 1, # for all intents this is reasonable
-                       sens.lamp = c(0.85, 0.90, 0.95), # bad day/lab to good day/lab
-                       spec.lamp = .99, # not dynamic yet
-                       lamp.diagnostic = c(F,T), # will affect PCR demand
-                       community.intro.daily.on = 1, 
-                       community.prob.daily.on = c(0.1,.5, 1), # every ten, 2, or 1 days
-                       community.intro.daily.off = 1, 
-                       community.prob.daily.off = c(0.1,.5, 1), # every ten, 2, or 1 days
-                       immunity = c(0.08358, 0.4179), # based on Fall 20 symptm, extrapolation to total
-                       N0 = 16750, #campus pop
-                       on.campus.prop = .25, #on/off division, only matters if we change on/off characteristics
-                       contact.tracing.limit = c(0,50,100), # limit on number of contact traces per day
-                       pooling = c(1,4,8), 
-                       pooling.multi = c(1,.5,.25), #is the effect of pooling on accuracy 1:1, or do added pools only reduce sensitivity slightly?
-                       days = 150, #simulation days
-                       sims = 50, # number of simulations
-                       ncores=NULL)
-```
-
 \section{2. Testing Strategies}
 \subsection{2.1 Surveillance and Testing on College Campuses}
 Numerous other college campuses have implemented testing and asymptomatic surveillance plans. We provide a brief overview of the salient details from select colleges and summarize the effectiveness of those plans.
@@ -149,43 +118,164 @@ We propose a set of scenarios to consider and evaluate in the context of epidemi
 \subsection{3.1 Comparing Model Output to empirical
  data from
 MSU \label{comparison-of-symptomatic-cases-in-model-to-empirical-cumulative-data-from-msu}}
-We collected cumulative case counts (weekly) from the Gallatin County Department of Health \cite{healthy_gallatin_2020}. These data were assumed to be the aggregated totals of symptomatic students associated with Montana State University, as asymptomatic students are unlikely to seek care. We compared these counts to the output of a susceptible-exposed-infected-recovered (SEIR)compartment model of a potential outbreak on campus. The conditions for the 200 simulations[\ref{fig:days}] assumed that 75\% of students comply with behavioral controls post-testing or contact tracing, 50\% of students with symptoms seek a test, a mean of 5 contacts can be traced per positive case - 20\% symptomatic, 80\% asymptomatic, there is a 1 day delay in action on contact tracing and there is no asymptomatic testing, there are 50 infectious introductions, 15\% of Students are immune (recovered or otherwise), R0 is 2.6, RE is 2.6*0.85, or 2.21, PCR has perfect sensitivity and specificity.
+We collected cumulative case counts (weekly) from the Gallatin County Department of Health \cite{healthy_gallatin_2020}. These data were assumed to be the aggregated totals of symptomatic students associated with Montana State University, as asymptomatic students are unlikely to seek care. We compared these counts to the output of a susceptible-exposed-infected-recovered (SEIR) compartment model of a potential outbreak on campus. The conditions for the 200 simulations[\ref{fig:days}] assumed that 75\% of students comply with behavioral controls post-testing or contact tracing, 50\% of students with symptoms seek a test, a maximum of 25 contacts can be traced per day, 50\% symptomatic, 50\% asymptomatic, a 1 day delay in action on contact tracing, and no asymptomatic testing. The initial population was seeded with 0.25% prevalence or 41 cases, and the proportion immune was 1.7% (based on US data from August 17th, 2020).
+
+Here, we show how model predictions compare to the witnessed cases on campus. Keep in mind that the cases reported on campus are symptomatic only. Consequently, here we only show model predictions for that specific subsect of infections. In the bottom left, model predictions are shown with a 95% containment interval from 50 simulations. The black dots represent weekly cumulative case counts reported to the Gallatin County Department of Health as associated with MSU. In the bottom right panel, we can see the predicted total cases across the student body, inclusive of symptomatic and asymptomatic cases plotted relative the actual and predicted data at bottom left. 
 
 This is not a truly “fit” model, instead we have chosen reasonable estimates from parameter space to approximate fit. In the future, this will entail a model-fitting procedure, augmented by data from the campus outbreak. However, our intention is not to predict cases, we only show this to demonstrate that our model, developed in summer 2020, captures the trend of the outbreak at MSU during fall 2020.
 
-\begin{figure}[h!]
-\includegraphics{figures/fig1-1.pdf}
-\caption{ }
-\label{fig:days}
-\end{figure}
+```{r, echo=FALSE}
+set.seed(123)
+output <- uni_sims_par(tst = c(0), 
+                       test.timeline = c("Sustained"),
+                       compliance = c(0.75), 
+                       init.prev = c(0.0025), 
+                       ppn_sympt = c(0.5), 
+                       care.seeking = c(0.5), 
+                       R0.on = c(2.2), 
+                       R0.off = c(2.2),
+                       test.scenario = c("1 Day"),
+                       sens.pcr = 1, 
+                       spec.pcr = 1, 
+                       sens.lamp = c(.9), 
+                       spec.lamp = .99, 
+                       lamp.diagnostic = c(F), 
+                       community.intro.daily.on = 1, 
+                       community.prob.daily.on = c(0.1), 
+                       community.intro.daily.off = 1, 
+                       community.prob.daily.off = c(0.1), 
+                       immunity = c(0.017),
+                       N0 = 16750, 
+                       on.campus.prop = .25,
+                       contact.tracing.limit = c(25), 
+                       pooling = c(1), 
+                       pooling.multi = c(1),
+                       days = 102,
+                       sims = 50, 
+                       ncores=4)
+
+output$lamp.diagnostic.f <- factor(output$lamp.diagnostic, levels = c("FALSE", "TRUE"), labels = c("PCR Conf.", "LAMP Diag."))
+out <- output %>% 
+  group_by(group) %>% 
+  mutate(cum.cases.on = cumsum(new.cases.on),
+         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+         cum.cases.off = cumsum(new.cases.off),
+         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+         cum.sum.missed = cumsum(missed.pcr),
+         pcr.demand = cumsum(symp.pcr) + cumsum(asymp.pcr)
+  )
+
+df <- data.frame(day = seq(17, by = 7, length.out = 13),
+                 new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265,203,105),
+                 cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990,1193,1298))
+a <-out %>%
+  filter(tests == 0) %>%
+  group_by(day) %>%
+  summarize(mean = mean(cum.reporting.symptoms.on+cum.reporting.symptoms.off)+0.0025*16750,
+            sd = sd(cum.reporting.symptoms.on+cum.reporting.symptoms.off),
+            upper = mean + 1.96*sd,
+            lower = mean - 1.96*sd,
+            mean. = mean(cum.cases.on+cum.cases.off)+0.0025*16750,
+            sd. = sd(cum.cases.on+cum.cases.off),
+            upper. = mean. + 1.96*sd.,
+            lower. = mean. - 1.96*sd.) %>%
+  ggplot(aes(x = day)) +
+  geom_line(aes(y=mean)) +
+  geom_ribbon(aes(ymax = upper, ymin = lower), alpha = 0.25) +
+  # geom_line(aes(y=mean.), col = "red", linetype = "dashed") +
+  # geom_ribbon(aes(ymax = upper., ymin = lower.), alpha = 0.1, col = "red", linetype = "dashed") +
+  geom_point(data = df, aes(x = day, y = cumulative_MSU_cases), color = "black") +
+  labs(y="Estimated Cumulative Cases \n (95% Of Simulations)",
+       x = "Day of Semester") +
+  scale_color_discrete(name = "",
+                       labels = "Weekly Cumulative \n Case Counts") + 
+  # scale_y_log10(n.breaks=7)+
+  theme_classic()
+b <- a + geom_line(aes(y=mean.), col = "red", linetype = "dashed") +
+  geom_ribbon(aes(ymax = upper., ymin = lower.), alpha = 0.1, col = "red", linetype = "dashed") 
+ggpubr::ggarrange(a,b)
+```
 
 \subsection{3.2 Testing frequency, not testing sensitivity, is the major
 driver of epidemic
 size \label{testing-frequency-not-testing-sensitivity-is-the-major-driver-of-epidemic-size}}
 The sensitivity and specificity of LAMP vs. the current standard, qPCR, has been evaluated. While initial estimates of sensitivity and specificity are encouraging (around 92.5\% and 98\%, respectively), the efficacy of LAMP as a diagnostic vs. surveillance tool is not known. LAMP, as the scales discussed below, may allow for public health officials to identify far more positive cases that would be possible if relying on symptomatic students seeking a diagnostic qPCRtest. However, the lower sensitivity of LAMP than qPCR (meaning that false-negatives are more frequent), could affect the effectiveness of LAMP as a screening tool. We evaluated increasing test frequency versus increasing test sensitivity within the SEIR model. 
-
-For the following and all below simulations, we assumed that 100\% of students comply with behavioral controls post-testing or contact tracing (to isolate sensitivity), that 100\% of students with symptoms seek care (to isolate sensitivity), a mean of 5 contacts can be traced per positive case, 20\% symptomatic, 80\% asymptomatic, 1 day delay in action on contact tracing, a variable number of LAMP and subsequent dynamic number of PCR confirmation tests per day, 50 infectious introductions, 15\% of Students are assumed immune (recovered or otherwise), R0 is 2.6, RE is 2.6*0.85, or 2.21, PCR has perfect sensitivity and specificity, LAMP is has a variable sensitivity, and specificity, though only sensitivity is considered here.
+For the following and all below simulations, we assumed that 100\% of students comply with behavioral controls post-testing or contact tracing (to isolate LAMP sensitivity), 50% students were assumed to seek care after symptomology, a total of 50 contacts can be traced per day, 35\% symptomatic, 65\% asymptomatic, 1 day delay in action on asymptomatic testing and 2 day delay on contact tracing, PCR has functionally perfect sensitivity and specificity, and $R_0$ was varied between 2.5 and 3. Variables considered include the number of LAMP and subsequent dynamic number of PCR confirmation tests per day, a variable number of infectious introductions and immunity, and LAMP is has a variable sensitivity (though specificity is locked at 98%).
 
 The number of LAMP tests per day (the faceting value across the top of figure \ref{fig:dynamite}) was more important than the sensitivity of the LAMP test in driving the total size of an epidemic. Increasing the number of tests available, and increasing the frequency of testing, is more important than increasing the sensitivity of LAMP alone. 
 
-```{r, fig.cap = "Figure created directly from R code", fig.width = 6, fig.height = 4, echo = F}
-df <- data.frame(day = seq(18, by = 7, length.out = 12), 
-                 new_MSU_cases = c(NA,3,7,66,43,60,65,99,132,212,265,203),
-                 cumulative_MSU_cases = c(38,41,48,114,157,217,282,381,513,725,990,1193))
+```{r}
+set.seed(123)
+output <- uni_sims_par(tst = c(0,250,500,1000,2000),
+                       test.timeline = c("Sustained"),
+                       compliance = c(1),
+                       init.prev = c(0.0025),
+                       ppn_sympt = c(0.35),
+                       care.seeking = c(1),
+                       R0.on = c(2.5,3),
+                       R0.off = c(2.5,3),
+                       test.scenario = c("1 Day"),
+                       sens.pcr = 1,
+                       spec.pcr = 1,
+                       sens.lamp = c(0.85, 0.9, 0.95, 0.99),
+                       spec.lamp = .98,
+                       lamp.diagnostic = c(F),
+                       community.intro.daily.on = 1,
+                       community.prob.daily.on = c(0.1),
+                       community.intro.daily.off = 1,
+                       community.prob.daily.off = c(0.1),
+                       immunity = c(0.1),
+                       N0 = 16750,
+                       on.campus.prop = .25,
+                       contact.tracing.limit = c(25),
+                       pooling = c(1),
+                       pooling.multi = c(1),
+                       days = 100,
+                       sims = 100,
+                       ncores=4)
 
-df %>% ggplot(aes(x = day, y = cumulative_MSU_cases)) + 
-  geom_point() + theme_bw() + 
-  ylab("Cumulative MSU COVID-19 Cases") +
-  labs(title = "Reported MSU COVID-19 Cases", caption = 'source: Gallatin county health department ') + geom_line()
+output$lamp.diagnostic.f <- factor(output$lamp.diagnostic, levels = c("FALSE", "TRUE"), labels = c("PCR Conf.", "LAMP Diag."))
+out <- output %>%
+  group_by(group) %>%
+  mutate(cum.cases.on = cumsum(new.cases.on),
+         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+         cum.cases.off = cumsum(new.cases.off),
+         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+         cum.sum.missed = cumsum(missed.pcr),
+         pcr.demand = cumsum(symp.pcr) + cumsum(asymp.pcr)
+  )
 
+out %>% 
+  filter(init.prev == 0.0025 &
+           day == max(day)) %>% 
+  group_by(tests, R0.on, sens.lamp,immunity) %>% 
+  summarize(mean = mean(cum.reporting.symptoms.on+cum.reporting.symptoms.off),
+            sd = sd(cum.reporting.symptoms.on+cum.reporting.symptoms.off),
+            upper = mean + 1.96*sd,
+            lower = mean - 1.96*sd) %>% 
+  ggplot(aes(x = sens.lamp, y = mean, ymax = upper, ymin = lower, color = factor(sens.lamp), fill = factor(sens.lamp)))+
+  geom_bar(stat="identity") +
+  geom_errorbar() +
+  facet_grid(R0.on~tests) +
+  theme_classic() +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d()
 ```
 
 
-\begin{figure}[h!]
-\includegraphics{figures/unnamed-chunk-1-1.pdf}
-\caption{ }
-\label{fig:dynamite}
-\end{figure}
+<!-- \begin{figure}[h!] -->
+<!-- \includegraphics{figures/unnamed-chunk-1-1.pdf} -->
+<!-- \caption{ } -->
+<!-- \label{fig:dynamite} -->
+<!-- \end{figure} -->
 
 \subsection{3.3 High testing frequency reduces epidemic size and
 consequently reduces PCR
@@ -197,11 +287,70 @@ Using the same parameters as above, we recorded the total number of symptomatic 
 
 In general, LAMP identifies cases which would otherwise go undetected if testing is based only on symptomatic qPCR. As such, even minor increases in LAMP testing are capable of reducing the epidemic size and thus overall qPCR demand. This trend continues until scenarios of 2000-4000 LAMP tests per day flatten the curve so that COVID-19 is extirpated and there is no qPCR demand. The additional effort to confirm LAMP tests with qPCR is compensated by the overall ability for LAMP to identify asymptomatic cases and reduce the size of the epidemic.
 
-\begin{figure}[h!]
-\includegraphics{figures/unnamed-chunk-2-1.pdf}
-\caption{ }
-\label{fig:pcr}
-\end{figure}
+```{r}
+set.seed(123)
+output <- uni_sims_par(tst = c(0,250, 500,1000,2000),
+                       test.timeline = c("Initial", "Sustained", "Both"),
+                       compliance = c(1),
+                       init.prev = c(0.0025),
+                       ppn_sympt = c(0.35),
+                       care.seeking = c(1),
+                       R0.on = c(3),
+                       R0.off = c(3),
+                       test.scenario = c("1 Day"),
+                       sens.pcr = 1,
+                       spec.pcr = 1,
+                       sens.lamp = c(0.85, 0.9, 0.95),
+                       spec.lamp = .98,
+                       lamp.diagnostic = c(F),
+                       community.intro.daily.on = 1,
+                       community.prob.daily.on = c(0.1),
+                       community.intro.daily.off = 1,
+                       community.prob.daily.off = c(0.1),
+                       immunity = c(0.1),
+                       N0 = 16750,
+                       on.campus.prop = .25,
+                       contact.tracing.limit = c(25),
+                       pooling = c(1),
+                       pooling.multi = c(1),
+                       days = 100,
+                       sims = 200,
+                       ncores=4)
+
+output$lamp.diagnostic.f <- factor(output$lamp.diagnostic, levels = c("FALSE", "TRUE"), labels = c("PCR Conf.", "LAMP Diag."))
+out <- output %>%
+  group_by(group) %>%
+  mutate(cum.cases.on = cumsum(new.cases.on),
+         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+         cum.cases.off = cumsum(new.cases.off),
+         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+         cum.sum.missed = cumsum(missed.pcr),
+         pcr.demand = cumsum(symp.pcr) + cumsum(asymp.pcr)
+  )
+
+out %>% 
+  filter(day == max(day)) %>% 
+  group_by(day, tests, test.timeline, sens.lamp) %>% 
+  summarize(mean = mean(pcr.demand),
+            sd = sd(pcr.demand),
+            upper = mean + 1.96*sd,
+            lower = mean - 1.96*sd) %>% 
+  ggplot(aes(x = factor(sens.lamp), y = mean, ymax = upper, ymin = lower, color = factor(sens.lamp), fill = factor(sens.lamp)))+
+  geom_bar(stat="identity") +
+  geom_errorbar() +
+  facet_grid(test.timeline~tests) +
+  theme_classic()
+```
+
+<!-- \begin{figure}[h!] -->
+<!-- \includegraphics{figures/unnamed-chunk-2-1.pdf} -->
+<!-- \caption{ } -->
+<!-- \label{fig:pcr} -->
+<!-- \end{figure} -->
 
 \subsection{3.4 The total number of missed cases is driven by prevalence
 and testing

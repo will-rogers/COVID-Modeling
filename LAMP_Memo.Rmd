@@ -1,0 +1,153 @@
+---
+title: "Cost of testing stategies in LAMP, qPCR, and isolations/quarantine beds"
+author: "Will Rogers"
+date: "12/2/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+### Running files 
+setwd("~/Downloads/Research/COVID-19/LAMP/COVID-Modeling")
+
+# Always rerun these if you edit the source file
+source("sir_lamp_function.R")
+source("sir_simple_step_function.R")
+source("uni_sim_function.R")
+source("uni_sim_par_function.R")
+source("plotting_functions.R")
+
+# These are good to have on hand
+library(data.table)
+library(mc2d)
+library(abind)
+```
+
+#### Costs of testing and isolation
+
+LAMP tests cost around $3.50 per test  
+qPCR tests cost around $10 per test
+We assume that housing students in quarantine/isolation costs 50$ per day, though we report raw student days as well
+
+
+### Testing Scenarios
+
+LAMP testing may be costly to implement. So, does the use of LAMP justify the cost of implementation? Cost can come from a number of mechanisms - raw dollars, student days lost in a semester, overburden of health infrastructure, etc. Here we attempt to describe four scenarios of testing:
+  1. No action beyond surveilance qPCR tests administered to symptomatic students
+  2. An attainable 2000 LAMP tests per day, confirmatory qPCR tests of positive LAMP students, and surveilance qPCR tests administered to symptomatic students
+  3. 2000 LAMP tests per day as diagnostic tests (pending FDA approval) and surveilance qPCR tests administered to symptomatic students
+  4. And 2000 LAMP tests per day with pooling factors of 1:3 and surveilance qPCR tests administered to symptomatic students
+  
+We will record the number of students isolating and quarantining per day as well as the number of days in excess of forcasted supply, the number of qPCR tests administered to symptomatic students and confirmatory qPCR tests as well as the number of days in excess of forcasted supply, and the costs 
+
+### Modeling assumptions
+
+Please refer to prior documentation of LAMP modeling for intricate descriptions of outcomes. Here, we assume that the epidemic on campus with have some general characteristics the epidemic in the Fall semester and maintain similar epidemilogical trends. Instead of considering all parameter space available, we will consider best and worst case scenarios, described below. 
+
+Best Case Scenario 
+  - Immunity is high (0.15)
+  - Introduced infections from students are low (0.0025)
+  - Introduced infections from the community are high (1 every 10 days)
+  - Student care-seeking (if symptomatic, seeking a qPCR test) is high (100%)
+  - Student compliance (if test positive or contact, isolating) is high (100%)
+  - R0, a measure of the epidemic's ability to grow, is low (2.5)
+  - Students are notified of their test results in the same day
+  - LAMP sensitivity is optimal (92.5%)
+  - Contact tracing occurs (25 per day maximum)
+  
+Worst Case Scenario 
+  - Immunity is low (0.05)
+  - Introduced infections from students are high (0.05)
+  - Introduced infections from the community are high (1 every 5 days)
+  - Student care-seeking (if symptomatic, seeking a qPCR test) is low (50%)
+  - Student compliance (if test positive or contact, isolating) is high (75%)
+  - R0, a measure of the epidemic's ability to grow, is high (3)
+  - Students are notified of their test results with a delay of 2 day
+  - LAMP sensitivity is suboptimal (80%)
+  - Contact tracing fails (0 per day maximum)
+
+```{r}
+set.seed(123)
+best <- uni_sims_par(tst = c(0,2000),
+                       test.timeline = c("Sustained","Both"),
+                       compliance = c(1),
+                       init.prev = c(0.005),
+                       ppn_sympt = c(0.35),
+                       care.seeking = c(1),
+                       R0.on = c(3),
+                       R0.off = c(3),
+                       test.scenario = c("1 Day"),
+                       sens.pcr = 0.99,
+                       spec.pcr = 0.99,
+                       sens.lamp = c(.925),
+                       spec.lamp = 0.98,
+                       lamp.diagnostic = c(F),
+                       community.intro.daily.on = 1,
+                       community.prob.daily.on = c(0.1),
+                       community.intro.daily.off = 1,
+                       community.prob.daily.off = c(0.1),
+                       immunity = c(0.05),
+                       N0 = 16750,
+                       on.campus.prop = .25,
+                       contact.tracing.limit = c(25),
+                       pooling = c(1,2),
+                       pooling.multi = c(.5),
+                       days = 100,
+                       sims = 100,
+                       ncores=4)
+
+best. <- best %>%
+  group_by(group) %>%
+  mutate(cum.cases.on = cumsum(new.cases.on),
+         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+         cum.cases.off = cumsum(new.cases.off),
+         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+         cum.sum.missed = cumsum(missed.pcr),
+         cum.iso.on = cumsum(isolation.complying.on),
+         cum.iso.off = cumsum(isolation.complying.off),
+         cum.qua.on = cumsum(quarantine.complying.on),
+         cum.qua.off = cumsum(quarantine.complying.off),
+         pcr.demand.sym = cumsum(symp.pcr), 
+         pcr.demand.asym = cumsum(asymp.pcr)
+  )
+
+best.cummulative <- best. %>% 
+  filter(day == max(day)) %>% 
+  group_by(tests, test.timeline, pooling) %>% 
+  summarize(cases.lower = quantile(cum.cases.on+cum.cases.off, 0.025),
+            cases.higher = quantile(cum.cases.on+cum.cases.off, 0.975),
+            iso.lower = quantile(cum.iso.on+cum.iso.off, 0.025),
+            iso.higher = quantile(cum.iso.on+cum.iso.off, 0.975),
+            quar.lower = quantile(cum.qua.on+cum.qua.off, 0.025),
+            quar.higher = quantile(cum.qua.on+cum.qua.off, 0.975),
+            sym.lower = quantile(pcr.demand.sym, 0.025)/0.05,
+            sym.higher = quantile(pcr.demand.sym, 0.975)/0.05,
+            asym.lower = quantile(pcr.demand.asym, 0.025),
+            asym.higher = quantile(pcr.demand.asym, 0.975)
+            ) 
+
+best. %>% 
+  ggplot(aes(x = day, y = isolation.complying.on+isolation.complying.off,
+             color = factor(tests))) +
+  geom_line() +
+  facet_grid(test.timeline~pooling)
+
+df <- best.cummulative[c(1:2,5:8),]
+df <- df %>% 
+  mutate(student.days.lost.lower = iso.lower+quar.lower,
+         student.days.lost.higher = iso.higher+quar.higher,
+         cost.asym.lower = asym.lower*20,
+         cost.asym.higher = asym.higher*20,
+         cost.sym.lower = sym.lower*20,
+         cost.sym.higher = sym.higher*20,
+         cost.lamp = 3.5*tests*100,
+         total.cost.lower = cost.asym.lower+cost.sym.lower+cost.lamp,
+         total.cost.higher = cost.asym.higher+cost.sym.higher+cost.lamp)
+write.csv(df, "SimulationsForPrice.csv")
+df
+```
+
