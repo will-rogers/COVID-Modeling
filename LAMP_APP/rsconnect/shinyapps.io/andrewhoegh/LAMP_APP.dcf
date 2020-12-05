@@ -1,0 +1,12 @@
+name: LAMP_APP
+title: LAMP_APP
+username:
+account: andrewhoegh
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3351009
+bundleId: 3941965
+url: https://andrewhoegh.shinyapps.io/LAMP_APP/
+when: 1607065850.94125
+asMultiple: FALSE
+asStatic: FALSE
