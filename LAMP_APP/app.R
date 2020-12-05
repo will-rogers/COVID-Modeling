@@ -31,7 +31,7 @@ body <- dashboardBody(
         ),
         box(
             title = "Epidemic Parameters: Immunity",
-            sliderInput('immune', "Proportion immune or recovered", value = .05, min = 0, max=.2, step = .025),
+            sliderInput('immune', "Proportion immune or recovered", value = .1, min = 0, max=.2, step = .025),
             solidHeader = TRUE,
             width = 3
         ),
@@ -52,7 +52,7 @@ body <- dashboardBody(
         box(title = 'Cumulative Cases ',
             plotOutput("epi_curve"),
             width = 3),
-        box(title = 'Isolation/Quarantine Demand',
+        box(title = 'On Campus Isolation/Quarantine Demand',
             plotOutput("iso"),
             width = 3),
         box(title = 'PCR Demand',
@@ -69,8 +69,8 @@ body <- dashboardBody(
     ),
     fluidRow(
         box(
-            title = "Intervention Parameters: # of tests",
-            sliderInput('test_numb', "Number of Tests", value = 2000, min = 0, max=2500, step = 250),
+            title = "Intervention Parameters: # of tests (daily)",
+            sliderInput('test_numb', "Number of Tests ", value = 2500, min = 0, max=5000, step = 250),
             solidHeader = TRUE,
             width = 4
         ),
@@ -91,7 +91,7 @@ body <- dashboardBody(
         box(title = 'Cumulative Cases ',
             plotOutput("epi_curve2"),
             width = 3),
-        box(title = 'Isolation/Quarantine Demand',
+        box(title = 'On Campus Isolation/Quarantine Demand',
             plotOutput("iso2"),
             width = 3),
         box(title = 'PCR Demand',
@@ -238,7 +238,7 @@ server <- function(input, output){
     output$pcr <- renderPlot(
         no_intervention() %>% 
             ggplot(aes(x = day, y = (symp.pcr + asymp.pcr) * 20, group = factor(group))) +
-            geom_line(alpha = .4) + theme_bw() + ylab("Number of Students") + labs(caption = 'assumes 5% positivity')
+            geom_line(alpha = .4) + theme_bw() + ylab("Number of Tests") + labs(caption = 'total calculated by assuming 5% positivity')
     )
     output$class_days <- renderPlot(
         no_intervention() %>%
@@ -260,7 +260,8 @@ server <- function(input, output){
                    pcr.demand.asym = cumsum(asymp.pcr)
             ) %>%
             ggplot(aes(x = day, y = cum.iso.on + cum.iso.off + cum.qua.on + cum.qua.off, group = factor(group))) +
-            geom_line(alpha = .4) + theme_bw() + ylab("Number of Student Class Days Missed \n Due to Isolation or Quarantine")
+            geom_line(alpha = .4) + theme_bw() + ylab("Number of Student Class Days Missed \n Due to Isolation or Quarantine") +
+            scale_y_continuous(sec.axis = sec_axis(~ . / input$N0, name = "Average Number of Class Days Missed per Student \n Due to Isolation or Quarantine" ))
     )
     
     output$epi_curve2 <- renderPlot(
@@ -291,14 +292,83 @@ server <- function(input, output){
         
         intervention() %>%
             ggplot(aes(x = day, y = isolation.complying.on + quarantine.complying.on, group = factor(group))) +
-            geom_line(alpha = .4) + theme_bw() + ylab("Number of Students")
+            geom_line(alpha = .4) + theme_bw() + ylab("Number of Students") + 
+            ylim(0, no_intervention() %>% mutate(y = isolation.complying.on + quarantine.complying.on ) %>% summarize(max_y = max(y)) %>% select(max_y) %>% pull())
         
     )
     output$pcr2 <- renderPlot(
         intervention() %>% 
             ggplot(aes(x = day, y = (symp.pcr + asymp.pcr) * 20, group = factor(group))) +
-            geom_line(alpha = .4) + theme_bw() + ylab("Number of Students") + labs(caption = 'assumes 5% positivity')
+            geom_line(alpha = .4) + theme_bw() + ylab("Number of Tests") + labs(caption = 'total calculated by assuming 5% positivity') +
+            ylim(0, no_intervention() %>% mutate(y = (symp.pcr + asymp.pcr) * 20 ) %>% summarize(max_y = max(y)) %>% select(max_y) %>% pull())
     )
+    # output$class_days2 <- renderPlot(
+    #     intervention() %>%
+    #         group_by(group) %>%
+    #         mutate(cum.cases.on = cumsum(new.cases.on),
+    #                cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+    #                cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+    #                cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+    #                cum.cases.off = cumsum(new.cases.off),
+    #                cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+    #                cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+    #                cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+    #                cum.sum.missed = cumsum(missed.pcr),
+    #                cum.iso.on = cumsum(isolation.complying.on),
+    #                cum.iso.off = cumsum(isolation.complying.off),
+    #                cum.qua.on = cumsum(quarantine.complying.on),
+    #                cum.qua.off = cumsum(quarantine.complying.off),
+    #                pcr.demand.sym = cumsum(symp.pcr), 
+    #                pcr.demand.asym = cumsum(asymp.pcr),
+    #                type = 'intervention'
+    #         ) %>%
+    #         ggplot(aes(x = day, y = cum.iso.on + cum.iso.off + cum.qua.on + cum.qua.off, group = factor(group))) +
+    #         geom_path(alpha = .4) + theme_bw() + ylab("Number of Student Class Days Missed \n Due to Isolation or Quarantine") +
+    #         scale_y_continuous(sec.axis = sec_axis(~ . / input$N0, name = "Average Number of Class Days Missed per Student \n Due to Isolation or Quarantine" ))
+    # )
+    # output$class_days2 <- renderPlot(
+    #     intervention() %>%
+    #         group_by(group) %>%
+    #         mutate(cum.cases.on = cumsum(new.cases.on),
+    #                cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+    #                cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+    #                cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+    #                cum.cases.off = cumsum(new.cases.off),
+    #                cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+    #                cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+    #                cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+    #                cum.sum.missed = cumsum(missed.pcr),
+    #                cum.iso.on = cumsum(isolation.complying.on),
+    #                cum.iso.off = cumsum(isolation.complying.off),
+    #                cum.qua.on = cumsum(quarantine.complying.on),
+    #                cum.qua.off = cumsum(quarantine.complying.off),
+    #                pcr.demand.sym = cumsum(symp.pcr),
+    #                pcr.demand.asym = cumsum(asymp.pcr),
+    #                type = 'intervention'
+    #         ) %>% bind_rows(no_intervention() %>%
+    #                             mutate(group = group + max(group)) %>%
+    #                             group_by(group) %>%
+    #                             mutate(cum.cases.on = cumsum(new.cases.on),
+    #                                    cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+    #                                    cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+    #                                    cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+    #                                    cum.cases.off = cumsum(new.cases.off),
+    #                                    cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+    #                                    cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+    #                                    cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+    #                                    cum.sum.missed = cumsum(missed.pcr),
+    #                                    cum.iso.on = cumsum(isolation.complying.on),
+    #                                    cum.iso.off = cumsum(isolation.complying.off),
+    #                                    cum.qua.on = cumsum(quarantine.complying.on),
+    #                                    cum.qua.off = cumsum(quarantine.complying.off),
+    #                                    pcr.demand.sym = cumsum(symp.pcr),
+    #                                    pcr.demand.asym = cumsum(asymp.pcr),
+    #                                    type = 'no intervention'
+    #                                    )) %>%
+    #         ggplot(aes(x = day, y = cum.iso.on + cum.iso.off + cum.qua.on + cum.qua.off, group = factor(group), color = type)) +
+    #         geom_path(alpha = .4) + theme_bw() + ylab("Number of Student Class Days Missed \n Due to Isolation or Quarantine") +
+    #         scale_y_continuous(sec.axis = sec_axis(~ . / input$N0, name = "Average Number of Class Days Missed per Student \n Due to Isolation or Quarantine" ))
+    # )
     output$class_days2 <- renderPlot(
         intervention() %>%
             group_by(group) %>%
@@ -315,11 +385,21 @@ server <- function(input, output){
                    cum.iso.off = cumsum(isolation.complying.off),
                    cum.qua.on = cumsum(quarantine.complying.on),
                    cum.qua.off = cumsum(quarantine.complying.off),
-                   pcr.demand.sym = cumsum(symp.pcr), 
-                   pcr.demand.asym = cumsum(asymp.pcr)
-            ) %>%
+                   pcr.demand.sym = cumsum(symp.pcr),
+                   pcr.demand.asym = cumsum(asymp.pcr),
+                   type = 'intervention'
+            )  %>%
             ggplot(aes(x = day, y = cum.iso.on + cum.iso.off + cum.qua.on + cum.qua.off, group = factor(group))) +
-            geom_line(alpha = .4) + theme_bw() + ylab("Number of Student Class Days Missed \n Due to Isolation or Quarantine")
+            geom_path(alpha = .4) + theme_bw() + ylab("Number of Student Class Days Missed \n Due to Isolation or Quarantine") +
+        
+            scale_y_continuous(limits = c(0,no_intervention() %>%
+                                              group_by(group) %>%
+                                              mutate(cum.iso.on = cumsum(isolation.complying.on),
+                                                     cum.iso.off = cumsum(isolation.complying.off),
+                                                     cum.qua.on = cumsum(quarantine.complying.on),
+                                                     cum.qua.off = cumsum(quarantine.complying.off),
+                                                     y = cum.iso.on + cum.iso.off + cum.qua.on + cum.qua.off) %>%
+                                              ungroup() %>% summarise(y = max(y)) %>% select(y) %>% pull()), sec.axis = sec_axis(~ . / input$N0, name = "Average Number of Class Days Missed per Student \n Due to Isolation or Quarantine" ))
     )
     output$no_strategy <- renderText(
         paste("The total cost of PCR testing is",
@@ -371,6 +451,31 @@ server <- function(input, output){
                   summarise(tests = mean(value)) %>% 
                   mutate(total_cost = tests * input$pcr_cost + input$lamp_cost * 100 * input$test_numb) %>% pull()  %>% dollar_format()()
         , "on average"))
+    output$strategy <- renderText(
+        paste("The total cost of PCR testing + LAMP is",
+              intervention() %>%
+                  group_by(group) %>%
+                  mutate(cum.cases.on = cumsum(new.cases.on),
+                         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+                         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+                         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+                         cum.cases.off = cumsum(new.cases.off),
+                         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+                         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+                         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+                         cum.sum.missed = cumsum(missed.pcr),
+                         cum.iso.on = cumsum(isolation.complying.on),
+                         cum.iso.off = cumsum(isolation.complying.off),
+                         cum.qua.on = cumsum(quarantine.complying.on),
+                         cum.qua.off = cumsum(quarantine.complying.off),
+                         pcr.demand.sym = cumsum(symp.pcr), 
+                         pcr.demand.asym = cumsum(asymp.pcr),
+                         total.pcr = pcr.demand.sym * 20 + pcr.demand.asym
+                  ) %>% group_by(group) %>%
+                  summarise(value=last(total.pcr)) %>% ungroup() %>%
+                  summarise(tests = mean(value)) %>% 
+                  mutate(total_cost = tests * input$pcr_cost + input$lamp_cost * 100 * input$test_numb) %>% pull()  %>% dollar_format()()
+              , "on average"))
 }
 
 
