@@ -20,7 +20,8 @@ uni_sims_par <- function(tst = 500,
                          contact.tracing.limit = 100,
                          pooling = 4, pooling.multi = 1,
                          days = 100, sims = 200,
-                         engage.lamp = 1:100,
+                         days.to.isolate = 10,
+                         days.to.quarantine = 10,
                          ncores=NULL){
   vars <- expand.grid("tst" = tst, 
                       "compliance" = compliance, 
@@ -43,9 +44,12 @@ uni_sims_par <- function(tst = 500,
                       "pooling" = pooling, 
                       "pooling.multi" = pooling.multi,
                       "days" = days, "sims" = sims,
-                      "test.timeline" = test.timeline)
+                      "test.timeline" = test.timeline,
+                      "days.to.isolate" = days.to.isolate,
+                      "days.to.quarantine" = days.to.quarantine)
   vars <- vars %>%
-    filter(R0.on == R0.off)
+    filter(R0.on == R0.off,
+           days.to.isolate == days.to.quarantine)
   if (is.null(ncores)){
   output <- rbindlist(apply(vars,1,FUN=function(x) uni_sim(tst = x[1], 
                                                            compliance = x[2], 
@@ -68,7 +72,9 @@ uni_sims_par <- function(tst = 500,
                                                            pooling = x[22],
                                                            pooling.multi = x[23],
                                                            days = x[24], sims = x[25],
-                                                           test.timeline = x[26])))
+                                                           test.timeline = x[26],
+                                                           days.to.isolate = x[27],
+                                                           days.to.quarantine = x[28])))
   } else {
     cl <- parallel::makeCluster(ncores)
     parallel::clusterExport(cl,varlist=c('uni_sim','lengthen','sir_lamp', 'sir_simple_step'))
@@ -102,7 +108,9 @@ uni_sims_par <- function(tst = 500,
                                                                    pooling = x[22],
                                                                    pooling.multi = x[23],
                                                                    days = x[24], sims = x[25],
-                                                                   test.timeline = x[26])))
+                                                                   test.timeline = x[26],
+                                                                   days.to.isolate = x[27],
+                                                                   days.to.quarantine = x[28])))
     parallel::stopCluster(cl)
     rm('cl')
   }

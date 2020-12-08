@@ -12,7 +12,8 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
                     community.prob.daily.off = 0.1,
                     immunity = 0.1, N0 = 16750, on.campus.prop = .25, 
                     contact.tracing.limit = 100, pooling = 4, pooling.multi = 1,
-                    days = 100, sims = 200){
+                    days = 100, sims = 200,
+                    days.to.isolate = 10, days.to.quarantine = 10){
   
   Tsim <- as.numeric(days)        # time to simulate over, we only care about start
   sims <- as.numeric(sims)    # number of simulations
@@ -39,6 +40,9 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   community.prob.daily.on <- as.numeric(community.prob.daily.on)
   community.intro.daily.off <- as.numeric(community.intro.daily.off)
   community.prob.daily.off <- as.numeric(community.prob.daily.off)
+  
+  days.to.quarantine <- as.numeric(days.to.quarantine)
+  days.to.isolate <- as.numeric(days.to.isolate)
   
   # storage vectors
   RE.on <- R0.on*(1-immunity)  # RE assuming some fraction of population is already immune
@@ -93,7 +97,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   comply_test_positives.off <- matrix(0,1,sims)
   symp.pcr <- matrix(0,1,sims)
   asymp.pcr <- matrix(0,1,sims)
-  missed.pcr <- matrix(0,1,sims)
+  cases.caught <- matrix(0,1,sims)
   N.off <- S.off+E.off+I1.off+I2.off+R.off
   
   atest.wait.3 <- array(0,c(1,sims,10))
@@ -171,10 +175,10 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     comply_test_positives.off <- rbind(comply_test_positives.off, apply(out[,57:58],1,sum))  # update state
     new_cases.off <- rbind(new_cases.off,out[,12])  # update state
     total_traces.off <- rbind(total_traces.off, apply(out[,44:48],1,sum))# update state
-    
+
     symp.pcr <- rbind(symp.pcr, out[,132])
     asymp.pcr <- rbind(asymp.pcr, out[,133])
-    missed.pcr <- rbind(missed.pcr, out[,134])
+    cases.caught <- rbind(cases.caught, out[,134])
     
     atest.wait.3 <- abind(atest.wait.3, array(out[,72:81], c(1,sims,10)), along = 1)
     atest.wait.2 <- abind(atest.wait.2, array(out[,82:91], c(1,sims,10)), along = 1)
@@ -184,11 +188,11 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     contact.wait.1 <- abind(contact.wait.1, array(out[,122:131], c(1,sims,10)), along = 1)
     ####################################################################################
     # Total in Isolation/Qurantine
-    isolation.on <- rbind(isolation.on,apply(comply_test_positives.on[(max(1,ts-10)):ts,],2,sum) + apply(symptrep.on[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
-    quarantine.on <- rbind(quarantine.on, apply(new_contacts.on[(max(1,ts-10)):ts,],2,sum) ) # quarantine for 14 days
+    isolation.on <- rbind(isolation.on,apply(comply_test_positives.on[(max(1,ts-days.to.isolate)):ts,],2,sum) + apply(symptrep.on[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
+    quarantine.on <- rbind(quarantine.on, apply(new_contacts.on[(max(1,ts-days.to.quarantine)):ts,],2,sum) ) # quarantine for 14 days
     
-    isolation.off <- rbind(isolation.off,apply(comply_test_positives.off[(max(1,ts-10)):ts,],2,sum) + apply(symptrep.off[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
-    quarantine.off <- rbind(quarantine.off, apply(new_contacts.off[(max(1,ts-10)):ts,],2,sum) )
+    isolation.off <- rbind(isolation.off,apply(comply_test_positives.off[(max(1,ts-days.to.isolate)):ts,],2,sum) + apply(symptrep.off[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
+    quarantine.off <- rbind(quarantine.off, apply(new_contacts.off[(max(1,ts-days.to.quarantine)):ts,],2,sum) )
   }
   
   inf.on <- I1.on+I2.on   # total infectious on campus
@@ -213,7 +217,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
               "total_traces.off" = total_traces.off,
               "symp.pcr" = symp.pcr,
               "asymp.pcr" = asymp.pcr,
-              "missed.pcr" = missed.pcr,
+              "cases.caught" = cases.caught,
               "tests"= matrix(tst,Tsim,sims),
               "compliance" = matrix(compliance,Tsim,sims),
               "init.prev"= matrix(init.prev,Tsim,sims),
@@ -239,6 +243,8 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
               "pooling.multi" = matrix(pooling.multi,Tsim,sims),
               "days" = matrix(days,Tsim,sims), 
               "sims" = matrix(sims,Tsim,sims),
-              "test.timeline" = test.timeline
+              "test.timeline" = test.timeline,
+              "days.to.isolate" = days.to.isolate,
+              "days.to.quarantine" = days.to.quarantine
               ))
 }
