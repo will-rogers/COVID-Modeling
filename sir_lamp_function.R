@@ -84,16 +84,15 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   
   avail.tests <- tests * pooling
     
-  if(0 %in% apply(out[,c(1:5,7:11)],1,sum)) browser()
     atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
     tested <- atests
     for (i in 1:sims){
       for (j in 1:10){
         if (j %in% c(3,4,8,9)){
-          tested[i,j] <- rbinom(1, atests[i,j], (1-(pooling*pooling.multi*(1-sens.lamp)))*compliance)
+          tested[i,j] <- rbinom(1, atests[i,j], (((pooling-1)*-pooling.multi)+sens.lamp)*compliance)
         }
         if (j %in% c(1,2,5,6,7,10)){
-          tested[i,j] <- rbinom(1, atests[i,j], pooling*pooling.multi*(1-(spec.lamp))*compliance)
+          tested[i,j] <- rbinom(1, atests[i,j], (1-((pooling-1)*-pooling.multi+spec.lamp))*compliance)
         }
       }
     }
@@ -116,8 +115,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
     }
   
     
-  missed.cases <- apply(atests[,c(3,4,8,9)] - tested.[,c(3,4,8,9)], 1, sum)
-
+  cases.caught <- apply(tested.[,c(3,4,8,9)], 1, sum) + newSymptReported.on + newSymptReported.off
   
   sympt.isolate <- matrix(0,nr=sims,nc=10) # storage for symptomatic cases to isolate
   sympt.isolate[,c(4)] <- newSymptReported.on
@@ -211,7 +209,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                contacts, tot.contacts, avail.tests, atests.isolate,
                sympt.isolate, newSymptReportedTrue.on, newSymptReportedTrue.off, 
                atest.wait.3,atest.wait.2,atest.wait.1,
-               contact.wait.3,contact.wait.2,contact.wait.1, sympt.pcr, asymp.pcr, missed.cases
+               contact.wait.3,contact.wait.2,contact.wait.1, sympt.pcr, asymp.pcr, cases.caught
   )
   # store all states -- SIR states plus tested, reported, contacts
 }

@@ -1,0 +1,673 @@
+---
+title: "Untitled"
+author: "Will Rogers"
+date: "12/5/2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+### Running files 
+setwd("~/Downloads/Research/COVID-19/LAMP/COVID-Modeling")
+
+# Always rerun these if you edit the source file
+source("sir_lamp_function.R")
+source("sir_simple_step_function.R")
+source("uni_sim_function.R")
+source("uni_sim_par_function.R")
+source("plotting_functions.R")
+
+# These are good to have on hand
+library(data.table)
+library(mc2d)
+library(abind)
+library(ggpubr)
+```
+
+
+```{r}
+set.seed(12345)
+output <- uni_sims_par(tst = c(0,2000), # no tests
+                       test.timeline = c("Sustained", "Both"), # doesnt matter with no tests
+                       compliance = c(.8,.95), # guess
+                       init.prev = c(0.01,0.03,0.05), # seems to provide resonable fit
+                       ppn_sympt = c(0.5), # .25 and .35 seem to be too low, some research says this is between .35-.5
+                       care.seeking = c(0.75), # guess
+                       R0.on = c(2,2.5,3), # slightly slowere epidemic
+                       R0.off = c(2,2.5,3), # slightly slowere epidemic
+                       test.scenario = c("1 Day"), # one day delay in testing, 2 day in contact tracing
+                       sens.pcr = .98, # PCR is assumed to be near perfect
+                       spec.pcr = .99,  # PCR is assumed to be near perfect
+                       sens.lamp = c(0.771), # doesnt matter here
+                       spec.lamp = .98,  # doesnt matter here
+                       lamp.diagnostic = c(F), # doesnt matter here
+                       community.intro.daily.on = 1, #one case ever 10 days from communtity
+                       community.prob.daily.on = c(0.01),
+                       community.intro.daily.off = 1, #one case ever 10 days from communtity
+                       community.prob.daily.off = c(0.01),
+                       immunity = c(0.05,0.15,0.25), # low initial immunity based on cases in US in August 20
+                       N0 = 16750, # total student body
+                       on.campus.prop = .25, # 1/4 live on campus
+                       contact.tracing.limit = c(25), # low number of contacts traced per day
+                       pooling = c(1,2,4), # doesnt matter
+                       pooling.multi = c(.1), # doesnt matter
+                       days = 100, #just for sim
+                       sims = 100, # reasonable reps
+                       days.to.isolate = c(7,10), days.to.quarantine = c(7,10),
+                       ncores=4) # for comuptational efficiency, make null if you want
+
+out <- output %>%
+  group_by(group) %>%
+  mutate(cum.cases.on = cumsum(new.cases.on),
+         cum.active = cumsum(active.inf.off+active.inf.on),
+         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+         cum.cases.off = cumsum(new.cases.off),
+         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+         cum.cases.caught = cumsum(cases.caught),
+         symp.demand = cumsum(symp.pcr),
+         asymp.demand = cumsum(asymp.pcr),
+         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
+         cum.iso.on = cumsum(isolation.complying.on),
+         cum.iso.off = cumsum(isolation.complying.off),
+         cum.qua.off = cumsum(quarantine.complying.off),
+         cum.qua.on = cumsum(quarantine.complying.on),
+  )
+write.csv(out, "modeling.1.csv")
+```
+
+```{r}
+out <- read.csv("modeling.1.csv")
+out$Scenario <- NA
+out$Scenario <- ifelse(out$R0.on == 2 &
+                       out$immunity == 0.25 &
+                       out$init.prev == 0.03, 
+                       "Best Case", out$Scenario)
+out$Scenario <- ifelse(out$R0.on == 2.5 &
+                       out$immunity == 0.15 &
+                       out$init.prev == 0.03, 
+                       "Likely Case", out$Scenario)
+out$Scenario <- ifelse(out$R0.on == 3 &
+                       out$immunity == 0.05 &
+                       out$init.prev == 0.03, 
+                       "Worst Case", out$Scenario)
+out <- out %>% 
+  filter(! is.na(Scenario))
+
+out$Testing <- NA
+out$Testing <- ifelse(out$tests == 0,  
+                       "No Surveillance", out$Testing)
+out$Testing <- ifelse(out$tests == 2000 &
+                       out$test.timeline == "Both" &
+                      out$pooling == 1,
+                       "Front-loaded LAMP", out$Testing)
+out$Testing <- ifelse(out$tests == 2000 &
+                       out$test.timeline == "Sustained" &
+                      out$pooling == 1,
+                       "LAMP No Pool", out$Testing)
+out$Testing <- ifelse(out$tests == 2000 &
+                       out$test.timeline == "Sustained" &
+                      out$pooling == 2,
+                       "LAMP Pool 2", out$Testing)
+out$Testing <- ifelse(out$tests == 2000 &
+                       out$test.timeline == "Sustained" &
+                      out$pooling == 4,
+                       "LAMP Pool 4", out$Testing)
+
+out <- out %>% 
+  filter(! is.na(Testing))
+
+out$Testing <- factor(out$Testing, levels = c("No Surveillance","LAMP No Pool",
+                                              "LAMP Pool 2","LAMP Pool 4",
+                                              "Front-loaded LAMP"))
+
+```
+
+### Case Count
+
+```{r}
+out %>% 
+  filter(!is.na(Testing) |
+           compliance == 0.8 &
+           days.to.isolate == 10) %>% 
+  ggplot(aes(x = day, y = cum.cases.on+cum.cases.off, group = group, color = Testing)) +
+  geom_line(alpha = .25) +
+  labs(y="Estimated Cumulative Cases\n (note: Sqrt-transform)",
+       x = "Day of Semester") +
+  scale_y_sqrt(n.breaks = 6)+
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  scale_color_discrete(na.value = NA) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+
+out %>% 
+  filter(!is.na(Testing) &
+           day == max(day) |
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  group_by(Testing,Scenario) %>%
+  summarize(mean = mean(cum.cases.on+cum.cases.off),
+            upper = quantile(cum.cases.on+cum.cases.off, .975),
+            lower = quantile(cum.cases.on+cum.cases.off, 0.025)) %>%
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="Cumulative Cases\n(95% Percentile)",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  theme(axis.text.x = element_blank())
+
+out %>% 
+  filter(!is.na(Testing)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  ggplot(aes(x = day, y = new.cases.on+new.cases.off, group = group, color = Testing)) +
+  geom_line(alpha = .1) +
+  labs(y="Estimated Daily Cases\n (note: Sqrt-transform)",
+       x = "Day of Semester") +
+  # scale_y_sqrt(n.breaks = 6)+
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  scale_color_discrete(na.value = NA) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+```
+
+### PCR Demand
+
+Based on 5% positivity in symptomatic testing
+
+```{r}
+out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  group_by(Testing,Scenario) %>% 
+  summarize(mean = mean((symp.demand*4)+asymp.demand),
+            upper = quantile((symp.demand*4)+asymp.demand, 0.975),
+            lower = quantile((symp.demand*4)+asymp.demand, 0.025)) %>% 
+  ggplot(aes(x = Testing, y = mean, ymax = upper, ymin = lower, color = Testing, fill = Testing)) +
+  geom_bar(stat = "identity") +
+  geom_errorbar(color = "black") +
+  labs(y="Estimated PCR Demand",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  theme(axis.text.x = element_blank())
+
+out %>% 
+  filter(!is.na(Testing)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  ggplot(aes(x = day, y = (symp.demand*4)+asymp.demand, group = group, color = Testing)) +
+  geom_line(alpha = .25) +
+  labs(y="Estimated PCR Demand",
+       x = "Day of Semester") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+
+out %>% 
+  filter(!is.na(Testing)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  ggplot(aes(x = day, y = symp.pcr*4, group = group, color = Testing)) +
+  geom_line(alpha = .25) +
+  labs(y="Estimated PCR Demand",
+       x = "Day of Semester") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+```
+
+### Percent of Active Cases Caught By LAMP vs No Strategy
+
+```{r}
+out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  group_by(group,Testing,Scenario) %>%
+  summarize(prop = cum.cases.caught/cum.active) %>%
+  group_by(Testing,Scenario) %>%
+  summarize(mean = mean(prop),
+            upper = quantile(prop, 0.975),
+            lower = quantile(prop, 0.025)) %>%
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="Proportion of Active Cases Discovered",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  theme(axis.text.x = element_blank())
+```
+
+### Isolation Room Needs On-Campus
+
+```{r}
+out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  group_by(Testing,Scenario) %>%
+  summarize(mean = mean(cum.iso.on),
+            upper = quantile(cum.iso.on, 0.975),
+            lower = quantile(cum.iso.on, 0.025)) %>%
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="Cumulative Number of On-Campus Isolation Rooms",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  theme(axis.text.x = element_blank())
+
+out %>% 
+  filter(!is.na(Testing)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  ggplot(aes(x = day, y = isolation.complying.on, color = Testing, group = group)) +
+  geom_line(alpha=0.15) +
+  labs(y="Daily Number of On-Campus Isolation Rooms",
+       x = "Day") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+```
+
+### Quarantine Room needs On-Campus
+
+As you can see, this is dictated by the daily limit on contact tracing.
+
+```{r}
+out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  group_by(Testing,Scenario) %>%
+  summarize(mean = mean(cum.qua.on),
+            upper = quantile(cum.qua.on, 0.975),
+            lower = quantile(cum.qua.on, 0.025)) %>%
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="Cumulative Number of On-Campus Quarantine Rooms",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  theme(axis.text.x = element_blank())
+
+out %>% 
+  filter(!is.na(Testing)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  ggplot(aes(x = day, y = quarantine.complying.on, color = Testing, group = group)) +
+  geom_line(alpha=0.15) +
+  labs(y="Daily Number of On-Campus Quarantine Rooms",
+       x = "Day") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+```
+
+### Total and mean number of student-days missed across the student body
+
+```{r}
+out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  group_by(Testing,Scenario) %>%
+  summarize(mean = mean(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on),
+            upper = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.975),
+            lower = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.025)) %>%
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="Cumulative Student-days Lost Over Semester\n(Per Student)",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  theme(axis.text.x = element_blank())
+
+out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  group_by(Testing,Scenario) %>%
+  summarize(mean = mean(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on)/16750,
+            upper = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.975)/16750,
+            lower = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.025)/16750) %>%
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="Average Student-days Lost Over Semester\n(Per Student)",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  theme(axis.text.x = element_blank())
+
+out %>% 
+  filter(!is.na(Testing)|
+           compliance == 0.8&
+           days.to.isolate == 10) %>% 
+  ggplot(aes(x = day, y = (cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on)/16750, color = Testing, group = group)) +
+  geom_line(alpha=0.15) +
+  labs(y="Average Student-days Lost Over Semester\n(Per Student)",
+       x = "Day") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+```
+
+### Potential Cost Discussion
+
+Let us assume that: 
+  - LAMP is 3.50 per test with all overhead and initialization costs and runs for 100 days
+  - qPCR is 12.50 (11 per test with 1.5 per test in overhead) 
+  - 5% positivity rate on symptomatic testing (blanket)
+  - Isolations rooms are $25/day (only for on-campus), and all off-campus isolation and quarantine rooms (on/off) are free 
+
+As such, this should be a fairly conservative comparison.
+
+```{r}
+a <- out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)&
+           days.to.isolate == 10) %>% 
+  group_by(Testing,Scenario,compliance) %>%
+  summarize(LAMP.cost = mean(tests)*3.50*100,
+            Symp.cost = mean(symp.demand)*12.5*4,
+            Asymp.cost = mean(asymp.demand)*12.5,
+            Iso.cost = mean(cum.iso.on)*50,
+            total.cost = sum(LAMP.cost,Symp.cost,Asymp.cost,Iso.cost)) 
+
+a <- melt(a, measure.vars = c("LAMP.cost", "Symp.cost", "Asymp.cost", "Iso.cost"))
+a$variable <- factor(a$variable, levels = c("LAMP.cost","Symp.cost","Asymp.cost", "Iso.cost"), labels = c("LAMP","Diagnostics", "Confirmation", "Isolation"))
+a %>% 
+  ggplot(aes(x = Testing, y = value/1e6, color = variable, fill = variable)) +
+  geom_bar(stat = "identity") +
+  labs(y="Cost (Millions)",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(compliance~Scenario) +
+  scale_fill_discrete(name = "Cost Category")+
+  scale_color_discrete(name = "Cost Category")+
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  rotate_x_text() +
+  geom_text(aes(Testing, total.cost/1e6 + .25, label = round(total.cost/1e6,2), fill = NULL), color = "black")
+```
+
+### There are lots of smart ways to use LAMP, one of which is to test students in quarantine/isolation, lessening the loss of student-days and potentially costs, too. 
+
+```{r}
+out$Iso.days <- factor(out$days.to.isolate, levels = c(10, 7), labels = c("10 Days", "7 Days"), ordered = T)
+p1 <- out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)|
+           compliance == 0.8) %>% 
+  group_by(Testing,Scenario,Iso.days) %>%
+  summarize(mean = mean(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on),
+            upper = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.975),
+            lower = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.025)) %>%
+  mutate(mean = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, mean),
+         upper = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, upper),
+         lower = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, lower)) %>% 
+  ggplot(aes(x = Iso.days, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity", position = "dodge") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black",position = "dodge") +
+  labs(y="Cumulative Student-days Lost Over Semester\n(Per Student)",
+       x = "Isolation/Quarantine Time") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+
+a <- out %>% 
+  filter(!is.na(Testing) &
+           day == max(day)&
+           compliance == "80%") %>% 
+  group_by(Testing,Scenario,Iso.days) %>%
+  summarize(LAMP.cost = mean(tests)*3.50*100,
+            Symp.cost = mean(symp.demand)*12.5*4,
+            Asymp.cost = mean(asymp.demand)*12.5,
+            Iso.cost = mean(cum.iso.on)*50,
+            Qur.cost = mean(cum.qua.on)*50,
+            total.cost = sum(LAMP.cost,Symp.cost,Asymp.cost,Iso.cost,Qur.cost),
+            total.cases = mean(cum.cases.on) + mean(cum.cases.off)
+            ) %>% 
+  group_by(Scenario) %>%
+  mutate(cases.relative = total.cases[Testing == "No Surveillance" &
+                                         Iso.days == "10 Days"],
+         cost.relative = total.cost[Testing == "No Surveillance" &
+                                         Iso.days == "10 Days"]) %>% 
+  mutate(cost.dif = total.cost-cost.relative,
+         case.dif = total.cases-cases.relative,
+         ratio = cost.dif/case.dif)
+
+# a <- melt(a, measure.vars = c("LAMP.cost", "Symp.cost", "Asymp.cost", "Iso.cost"))
+# a$variable <- factor(a$variable, levels = c("LAMP.cost","Symp.cost","Asymp.cost", "Iso.cost"), labels = c("LAMP","Diagnostics", "Confirmation", "Isolation"))
+# a %>% 
+#   mutate(value = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, value),
+#          total.cost = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, total.cost)) %>% 
+#   ggplot(aes(x = Testing, y = value/1e6, color = variable, fill = variable)) +
+#   geom_bar(stat = "identity") +
+#   labs(y="Cost (Millions)",
+#        x = "Testing Scenario") +
+#   theme_classic() + 
+#   facet_grid(Iso.days~Scenario) +
+#   scale_fill_discrete(name = "Cost Category")+
+#   scale_color_discrete(name = "Cost Category")+
+#   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+#   rotate_x_text() +
+#   geom_text(aes(Testing, total.cost/1e6 + .25, label = round(total.cost/1e6,2), fill = NULL), color = "black")
+
+a %>%
+  filter(Testing != "No Surveillance" & Iso.days == "10 Days") %>% 
+  ggplot(aes(x = Testing, y = -ratio, color = Testing, fill = Testing)) +
+  geom_bar(stat = "identity") +
+  labs(y="Cost of a 1-case Reduction from No LAMP",
+       x = "Testing Scenario") +
+  theme_classic() +
+  facet_grid(.~Scenario) +
+  scale_fill_discrete(name = "Cost Category")+
+  scale_color_discrete(name = "Cost Category")+
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  rotate_x_text() +
+  geom_text(aes(Testing, -ratio+20, label = round(-ratio,0), fill = NULL), color = "black")
+```
+
+### One of the important aspects of LAMP is it's potential to detemine when an epidemic is peaking, and potentially when to shut down
+
+```{r}
+a <- out %>% 
+  filter(!is.na(Testing) |
+           compliance == 0.8 &
+           days.to.isolate == 10) %>% 
+  group_by(Testing, Scenario, group) %>%
+  summarize(peak = min(day[(active.inf.on+active.inf.off) == max(active.inf.on+active.inf.off)])) %>% 
+  group_by(Testing, Scenario) %>% 
+  summarize(mean = mean(peak),
+            upper = quantile(peak,0.975),
+            lower = quantile(peak,0.025))
+b <- out %>% 
+  filter(!is.na(Testing) |
+           compliance == 0.8 &
+           days.to.isolate == 10) %>% 
+  group_by(Testing, Scenario, group) %>%
+  summarize(peak.obs = min(day[(cases.caught) == max(cases.caught)])) %>% 
+  group_by(Testing, Scenario) %>% 
+  summarize(mean = mean(peak.obs),
+            upper = quantile(peak.obs,0.975),
+            lower = quantile(peak.obs,0.025)) 
+
+df <- rbind(a,b)
+df$truth <- rep(c("Truth", "Observed"), each = 15)
+df$group <- rep(1:15,2)
+
+df %>% 
+  # filter(Testing != "Front-loaded LAMP") %>% 
+  ggplot(aes(x = Testing, y = mean, color = truth, group = truth)) +
+  geom_errorbar(aes(ymax = upper, ymin = lower), color = "black", 
+                position = position_dodge(width = 1)) +
+  geom_point(size = 2, position = position_dodge(width = 1)) +
+  labs(y="Days from Peak (Truth-Observed)",
+       x = "Testing Scenario") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2))) +
+  rotate_x_text()
+
+a <- out %>% 
+  filter(
+           compliance == "80%" &
+           Iso.days == "10 Days") %>% 
+  group_by(day, Scenario, Testing) %>% 
+  summarize(mean = mean(isolation.complying.on),
+            upper = quantile(isolation.complying.on, 0.975),
+            lower = quantile(isolation.complying.on, 0.025)) %>% 
+  mutate(data = "Active Cases")
+b <- out %>% 
+  filter(
+           compliance == "80%" &
+           days.to.isolate == 10) %>% 
+  group_by(day, Scenario, Testing) %>% 
+  summarize(mean = mean(cases.caught),
+            upper = quantile(cases.caught, 0.975),
+            lower = quantile(cases.caught, 0.025)) %>% 
+  mutate(data = "Observed")
+
+df <- rbind(a,b)
+
+df %>% 
+  ggplot(aes(x = day, y = mean, color = data, fill = data)) +
+  geom_ribbon(aes(ymax = upper, ymin = lower), color = NA, alpha = 0.25) +
+  geom_line() +
+  labs(y="Estimated (95% Percentile)",
+       x = "Day in Semester") +
+  theme_classic() + 
+  facet_grid(Testing~Scenario) +
+  # guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2))) +
+  rotate_x_text() +
+  scale_y_sqrt()
+```
+
+```{r}
+c <- out %>% 
+  filter(!is.na(Testing) &
+           compliance == "80%" &
+           days.to.isolate == 10 &
+           Scenario == "Worst Case") %>% 
+  group_by(Testing, Scenario, group) %>%
+  summarize(above.iso = sum(isolation.complying.on+quarantine.complying.on>200)) %>% 
+  group_by(Testing, Scenario) %>% 
+  summarize(mean = mean(above.iso),
+            upper = quantile(above.iso,0.975),
+            lower = quantile(above.iso,0.025)) %>% 
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  # geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="Number of Days above Isolation/\nQuarantine Capacity (200)",
+       x = "Testing Strategy") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2))) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank())
+
+b <- out %>% 
+  filter(!is.na(Testing) &
+           compliance == "80%" &
+           days.to.isolate == 10 &
+           Scenario == "Worst Case") %>% 
+  group_by(Testing, Scenario, group) %>%
+  summarize(above.iso = min(day[isolation.complying.on+quarantine.complying.on>200])) %>% 
+  group_by(Testing, Scenario) %>% 
+  summarize(mean = mean(above.iso),
+            upper = quantile(above.iso,0.975),
+            lower = quantile(above.iso,0.025)) %>% 
+  ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
+  geom_bar(stat="identity") +
+  # geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  labs(y="First Day above Isolation/\nQuarantine Capacity (200)",
+       x = "Testing Strategy") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2))) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank())
+
+a <- out %>% 
+  filter(!is.na(Testing) &
+           compliance == "80%" &
+           days.to.isolate == 10 &
+           Scenario == "Worst Case") %>% 
+  group_by(Testing, Scenario,day) %>% 
+  summarize(mean = mean(isolation.complying.on+quarantine.complying.on),
+            upper = quantile(isolation.complying.on+quarantine.complying.on,0.975),
+            lower = quantile(isolation.complying.on+quarantine.complying.on,0.025)) %>% 
+  ggplot(aes(x = day, y = mean, color = Testing, fill = Testing)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.25) +
+  geom_line() +
+  geom_hline(yintercept = 200, linetype = "dashed") +
+  labs(y="Isolation/Quarantine\nDemand vs. Capacity (200)",
+       x = "Day of Semester") +
+  theme_classic() + 
+  facet_grid(.~Scenario)+
+  guides(colour = guide_legend(override.aes = list(alpha = 1))) 
+d <- ggarrange(c,b)
+ggarrange(d,a, nrow = 2)
+```
+
+```{r}
+a <- out %>% 
+  filter(!is.na(Testing) &
+           compliance == "80%" &
+           days.to.isolate == 10) %>% 
+  group_by(Testing, Scenario) %>%
+  summarize(day = ifelse(min(day[cum.cases.on+cum.cases.off>1000]) == Inf, 0, min(day[cum.cases.on+cum.cases.off>1000]))) %>% 
+  ggplot(aes(x = Testing, y = day, fill = Testing)) +
+  geom_bar(stat="identity") +
+  labs(y="First Day above\n1000 Cumulative Cases",
+       x = "Testing Strategy") +
+  theme_classic() + 
+  facet_grid(.~Scenario) +
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2))) +
+  theme(legend.position = "none",
+        axis.text.x = element_blank())
+b <- out %>% 
+  filter(!is.na(Testing) &
+           compliance == "80%" &
+           days.to.isolate == 10) %>% 
+  group_by(Testing, Scenario, day) %>%
+  summarize(mean = mean(cum.cases.on+cum.cases.off),
+            upper = quantile(cum.cases.on+cum.cases.off,0.975),
+            lower = quantile(cum.cases.on+cum.cases.off,0.025)) %>% 
+  ggplot(aes(x = day, y = mean, color = Testing, fill = Testing)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.25) +
+  geom_line() +
+  geom_hline(yintercept = 1000, linetype = "dashed") +
+  labs(y="Cumulative Cases vs.\n1000-Case Metric",
+       x = "Testing Strategy") +
+  theme_classic() + 
+  facet_grid(.~Scenario)+
+  scale_y_log10()
+ggarrange(a,b, nrow = 2, common.legend = T, legend = "right")
+```
+
