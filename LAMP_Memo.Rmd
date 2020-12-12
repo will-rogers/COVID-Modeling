@@ -79,7 +79,7 @@ best <- uni_sims_par(tst = c(0,2000),
                        test.scenario = c("1 Day"),
                        sens.pcr = 0.99,
                        spec.pcr = 0.99,
-                       sens.lamp = c(.925),
+                       sens.lamp = c(.771),
                        spec.lamp = 0.98,
                        lamp.diagnostic = c(F),
                        community.intro.daily.on = 1,
@@ -124,14 +124,16 @@ best.cummulative <- best. %>%
             iso.higher = quantile(cum.iso.on+cum.iso.off, 0.975),
             quar.lower = quantile(cum.qua.on+cum.qua.off, 0.025),
             quar.higher = quantile(cum.qua.on+cum.qua.off, 0.975),
-            sym.lower = quantile(pcr.demand.sym, 0.025)/0.05,
-            sym.higher = quantile(pcr.demand.sym, 0.975)/0.05,
+            sym.lower = quantile(pcr.demand.sym, 0.025),
+            sym.higher = quantile(pcr.demand.sym, 0.975),
+            sym.demand.lower = quantile(pcr.demand.sym, 0.025)/0.05,
+            sym.demand.higher = quantile(pcr.demand.sym, 0.975)/0.05,
             asym.lower = quantile(pcr.demand.asym, 0.025),
             asym.higher = quantile(pcr.demand.asym, 0.975)
             ) 
 
 best. %>% 
-  ggplot(aes(x = day, y = isolation.complying.on+isolation.complying.off,
+  ggplot(aes(x = day, y = symp.pcr*20,
              color = factor(tests))) +
   geom_line() +
   facet_grid(test.timeline~pooling)
@@ -140,10 +142,10 @@ df <- best.cummulative[c(1:2,5:8),]
 df <- df %>% 
   mutate(student.days.lost.lower = iso.lower+quar.lower,
          student.days.lost.higher = iso.higher+quar.higher,
-         cost.asym.lower = asym.lower*20,
-         cost.asym.higher = asym.higher*20,
-         cost.sym.lower = sym.lower*20,
-         cost.sym.higher = sym.higher*20,
+         cost.asym.lower = asym.lower*11,
+         cost.asym.higher = asym.higher*11,
+         cost.sym.lower = sym.demand.lower*11,
+         cost.sym.higher = sym.demand.higher*11,
          cost.lamp = 3.5*tests*100,
          total.cost.lower = cost.asym.lower+cost.sym.lower+cost.lamp,
          total.cost.higher = cost.asym.higher+cost.sym.higher+cost.lamp)

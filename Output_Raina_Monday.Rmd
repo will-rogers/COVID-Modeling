@@ -99,7 +99,7 @@ out <- out %>%
 
 out$Testing <- NA
 out$Testing <- ifelse(out$tests == 0,  
-                       "No Surveillance", out$Testing)
+                       "Symtomatic-only Testing", out$Testing)
 out$Testing <- ifelse(out$tests == 2000 &
                        out$test.timeline == "Both" &
                       out$pooling == 1,
@@ -120,7 +120,7 @@ out$Testing <- ifelse(out$tests == 2000 &
 out <- out %>% 
   filter(! is.na(Testing))
 
-out$Testing <- factor(out$Testing, levels = c("No Surveillance","LAMP No Pool",
+out$Testing <- factor(out$Testing, levels = c("Symtomatic-only Testing","LAMP No Pool",
                                               "LAMP Pool 2","LAMP Pool 4",
                                               "Front-loaded LAMP"))
 
@@ -143,7 +143,7 @@ out %>%
   scale_color_discrete(na.value = NA) +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
 
-out %>% 
+a <- out %>% 
   filter(!is.na(Testing) &
            day == max(day) |
            compliance == 0.8&
@@ -160,7 +160,9 @@ out %>%
   theme_classic() + 
   facet_grid(.~Scenario) +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  theme(axis.text.x = element_blank())
+  theme(axis.text.x = element_blank())+
+  scale_y_continuous(n.breaks = 10)
+
 
 out %>% 
   filter(!is.na(Testing)|
@@ -179,10 +181,10 @@ out %>%
 
 ### PCR Demand
 
-Based on 5% positivity in symptomatic testing
+Based on 25% positivity in symptomatic testing
 
 ```{r}
-out %>% 
+b <- out %>% 
   filter(!is.na(Testing) &
            day == max(day)|
            compliance == 0.8&
@@ -199,7 +201,8 @@ out %>%
   theme_classic() + 
   facet_grid(.~Scenario) +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  theme(axis.text.x = element_blank())
+  theme(axis.text.x = element_blank())+
+  scale_y_continuous(n.breaks = 10)
 
 out %>% 
   filter(!is.na(Testing)|
@@ -229,7 +232,7 @@ out %>%
 ### Percent of Active Cases Caught By LAMP vs No Strategy
 
 ```{r}
-out %>% 
+c <- out %>% 
   filter(!is.na(Testing) &
            day == max(day)|
            compliance == 0.8&
@@ -243,47 +246,148 @@ out %>%
   ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
   geom_bar(stat="identity") +
   geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Proportion of Active Cases Discovered",
+  labs(y="Proportion of Daily\nActive Cases Discovered",
        x = "Testing Scenario") +
   theme_classic() + 
   facet_grid(.~Scenario) +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
   theme(axis.text.x = element_blank())
+
+require(gridExtra)
+
+ggarrange(ggarrange(a,b, legend = "none", nrow=1),c, nrow=2)
 ```
 
 ### Isolation Room Needs On-Campus
 
 ```{r}
-out %>% 
+out$Iso.days <- factor(out$days.to.isolate, levels = c(10, 7), labels = c("10 Days", "7 Days"), ordered = T)
+a<-out %>% 
   filter(!is.na(Testing) &
            day == max(day)|
-           compliance == 0.8&
-           days.to.isolate == 10) %>% 
-  group_by(Testing,Scenario) %>%
-  summarize(mean = mean(cum.iso.on),
-            upper = quantile(cum.iso.on, 0.975),
-            lower = quantile(cum.iso.on, 0.025)) %>%
+           compliance == 0.8) %>% 
+  group_by(Testing,Scenario,Iso.days) %>%
+  summarize(mean = mean(cum.iso.on+cum.iso.off+cum.qua.on+cum.qua.off),
+            upper = quantile(cum.iso.on+cum.iso.off+cum.qua.on+cum.qua.off, 0.975),
+            lower = quantile(cum.iso.on+cum.iso.off+cum.qua.on+cum.qua.off, 0.025)) %>%
+  mutate(mean = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Best Case" , mean[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Best Case"], mean),
+         mean = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Likely Case" , mean[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Likely Case"], mean),
+         mean = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Worst Case" , mean[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Worst Case"], mean),
+         upper = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Best Case" , upper[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Best Case"], upper),
+         upper = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Likely Case" , upper[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Likely Case"], upper),
+         upper = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Worst Case" , upper[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Worst Case"], upper),
+         lower = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Best Case" , lower[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Best Case"], lower),
+         lower = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Likely Case" , lower[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Likely Case"], lower),
+         lower = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Worst Case" , lower[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Worst Case"], lower)) %>% 
   ggplot(aes(x = Testing, y = mean, color = Testing, fill = Testing)) +
   geom_bar(stat="identity") +
   geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Cumulative Number of On-Campus Isolation Rooms",
+  labs(y="Cumulative Student Days Lost",
        x = "Testing Scenario") +
   theme_classic() + 
-  facet_grid(.~Scenario) +
+  facet_grid(Iso.days~Scenario) +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  theme(axis.text.x = element_blank())
+  theme(axis.text.x = element_blank()) +
+  scale_y_continuous(n.breaks = 10)
 
-out %>% 
+b<-out %>% 
   filter(!is.na(Testing)|
-           compliance == 0.8&
-           days.to.isolate == 10) %>% 
-  ggplot(aes(x = day, y = isolation.complying.on, color = Testing, group = group)) +
-  geom_line(alpha=0.15) +
-  labs(y="Daily Number of On-Campus Isolation Rooms",
+           compliance == 0.8) %>% 
+  group_by(Testing,Scenario,Iso.days,day) %>%
+  summarize(mean = mean(isolation.complying.on + quarantine.complying.on),
+            upper = quantile(isolation.complying.on + quarantine.complying.on, 0.975),
+            lower = quantile(isolation.complying.on + quarantine.complying.on, 0.025)) %>%
+  group_by(day) %>% 
+  mutate(mean = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Best Case" , mean[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Best Case"], mean),
+         mean = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Likely Case" , mean[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Likely Case"], mean),
+         mean = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Worst Case" , mean[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Worst Case"], mean),
+         upper = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Best Case" , upper[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Best Case"], upper),
+         upper = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Likely Case" , upper[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Likely Case"], upper),
+         upper = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Worst Case" , upper[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Worst Case"], upper),
+         lower = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Best Case" , lower[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Best Case"], lower),
+         lower = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Likely Case" , lower[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Likely Case"], lower),
+         lower = ifelse(Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "7 Days" &
+                        Scenario == "Worst Case" , lower[Testing  == "Symtomatic-only Testing" &
+                        Iso.days == "10 Days" &
+                        Scenario == "Worst Case"], lower)) %>% 
+  ggplot(aes(x = day, y = mean, color = Testing, fill = Testing)) +
+  geom_line() +
+  geom_ribbon(aes(ymax=upper, ymin=lower), color = NA, alpha = 0.25) +
+  labs(y="Daily Number of On-Campus\nIsolation and Quarantine Rooms",
        x = "Day") +
   theme_classic() + 
-  facet_grid(.~Scenario) +
+  facet_grid(Iso.days~Scenario) +
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))
+ggarrange(a,b, common.legend = T, legend = "bottom")
 ```
 
 ### Quarantine Room needs On-Campus
@@ -427,9 +531,9 @@ p1 <- out %>%
   summarize(mean = mean(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on),
             upper = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.975),
             lower = quantile(cum.qua.on+cum.qua.off+cum.iso.off+cum.iso.on, 0.025)) %>%
-  mutate(mean = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, mean),
-         upper = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, upper),
-         lower = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, lower)) %>% 
+  mutate(mean = ifelse(Testing == "Symtomatic-only Testing" & Iso.days == "7 Days", NA, mean),
+         upper = ifelse(Testing == "Symtomatic-only Testing" & Iso.days == "7 Days", NA, upper),
+         lower = ifelse(Testing == "Symtomatic-only Testing" & Iso.days == "7 Days", NA, lower)) %>% 
   ggplot(aes(x = Iso.days, y = mean, color = Testing, fill = Testing)) +
   geom_bar(stat="identity", position = "dodge") +
   geom_errorbar(aes(ymax=upper, ymin=lower), color = "black",position = "dodge") +
@@ -461,25 +565,25 @@ a <- out %>%
          case.dif = total.cases-cases.relative,
          ratio = cost.dif/case.dif)
 
-# a <- melt(a, measure.vars = c("LAMP.cost", "Symp.cost", "Asymp.cost", "Iso.cost"))
-# a$variable <- factor(a$variable, levels = c("LAMP.cost","Symp.cost","Asymp.cost", "Iso.cost"), labels = c("LAMP","Diagnostics", "Confirmation", "Isolation"))
-# a %>% 
-#   mutate(value = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, value),
-#          total.cost = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, total.cost)) %>% 
-#   ggplot(aes(x = Testing, y = value/1e6, color = variable, fill = variable)) +
-#   geom_bar(stat = "identity") +
-#   labs(y="Cost (Millions)",
-#        x = "Testing Scenario") +
-#   theme_classic() + 
-#   facet_grid(Iso.days~Scenario) +
-#   scale_fill_discrete(name = "Cost Category")+
-#   scale_color_discrete(name = "Cost Category")+
-#   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-#   rotate_x_text() +
-#   geom_text(aes(Testing, total.cost/1e6 + .25, label = round(total.cost/1e6,2), fill = NULL), color = "black")
+a <- melt(a, measure.vars = c("LAMP.cost", "Symp.cost", "Asymp.cost", "Iso.cost"))
+a$variable <- factor(a$variable, levels = c("LAMP.cost","Symp.cost","Asymp.cost", "Iso.cost"), labels = c("LAMP","Diagnostics", "Confirmation", "Isolation"))
+a %>%
+  mutate(value = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, value),
+         total.cost = ifelse(Testing == "No Surveillance" & Iso.days == "7 Days", NA, total.cost)) %>%
+  ggplot(aes(x = Testing, y = value/1e6, color = variable, fill = variable)) +
+  geom_bar(stat = "identity") +
+  labs(y="Cost (Millions)",
+       x = "Testing Scenario") +
+  theme_classic() +
+  facet_grid(Iso.days~Scenario) +
+  scale_fill_discrete(name = "Cost Category")+
+  scale_color_discrete(name = "Cost Category")+
+  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
+  rotate_x_text() +
+  geom_text(aes(Testing, total.cost/1e6 + .25, label = round(total.cost/1e6,2), fill = NULL), color = "black")
 
 a %>%
-  filter(Testing != "No Surveillance" & Iso.days == "10 Days") %>% 
+  filter(Testing != "Symtomatic-only Testing" & Iso.days == "10 Days") %>% 
   ggplot(aes(x = Testing, y = -ratio, color = Testing, fill = Testing)) +
   geom_bar(stat = "identity") +
   labs(y="Cost of a 1-case Reduction from No LAMP",
@@ -669,5 +773,77 @@ b <- out %>%
   facet_grid(.~Scenario)+
   scale_y_log10()
 ggarrange(a,b, nrow = 2, common.legend = T, legend = "right")
+```
+
+```{r}
+library(readr)
+Sheet <- read_csv("University Testing Programs and Results - Sheet2.csv")
+View(univ)
+
+Sheet$Surveillance <- ifelse(str_detect(Sheet$'Asymptomatic Screening?',"es"), "Surveillance Testing", "No Surveillance Testing")
+
+Sheet$Surveillance <- ifelse(Sheet$Online == "Yes", 
+                             paste(Sheet$Surveillance, "& Online"),
+                             paste(Sheet$Surveillance, "& In-Person"))
+Sheet$Surveillance <- factor(Sheet$Surveillance, levels = c("No Surveillance Testing & Online",
+                                      "No Surveillance Testing & In-Person", 
+                                      "Surveillance Testing & In-Person",     
+                                      NA  ), 
+       labels = c("No Surveillance Testing & Online",
+                  "No Surveillance Testing & In-Person",
+                  "Surveillance Testing & In-Person"))
+Sheet %>% 
+  mutate(Surveillance = ifelse(X1=="Montana State University" | X1=="University of Montana", "MSU and UM", Surveillance)) %>% 
+  group_by(Surveillance,Group,Online) %>% 
+  summarize(total = n()) %>% 
+  mutate(prop = ifelse(Group == "Big Sky", 
+                       total/14, NA),
+         prop = ifelse(Group == "Land Grant", 
+                       total/76, prop)) %>% 
+  ggplot(aes(x = 2, y = prop, fill = factor(Surveillance))) +
+  geom_bar(stat = "identity", color = "white") +
+  geom_text(aes(y = c(.8,.985,.56,.88,.3,.40,.075,.06,.025), label = total), color = "Black") +
+  facet_grid(.~Group) +
+  coord_polar(theta = "y", start = 0)+
+  scale_fill_discrete(name = "",
+                       labels = c("No Surveillance Testing & Online",
+                                  "No Surveillance Testing & In-Person",
+                                  "Surveillance Testing & In-Person",
+                                  "MSU or UM",
+                                  "Unspecified"),
+                       na.value = "grey") +
+  theme_void() +
+  xlim(0.5, 2.5) +
+  theme(legend.position = "right",
+        text = element_text(size = 15),
+        legend.text = element_text(size = 7.5))
+```
+
+Tabulated results
+```{r}
+1/6
+tab <- out %>% 
+  group_by(Testing, compliance, Scenario, Iso.days) %>% 
+  summarize(mean.cases = mean(cum.cases.on+cum.cases.off),
+            sd.cases = sd(cum.cases.on+cum.cases.off),
+            LAMP.cost = tests*3.5*100,
+            mean.symp.pcr = mean(symp.demand),
+            sd.symp.pcr = sd(symp.demand),
+            mean.asymp.pcr = mean(asymp.demand),
+            sd.asymp.pcr = sd(asymp.demand),
+            mean.testing.costs = mean((symp.demand*12.5)+(asymp.demand*12.5)+(tests*3.5*100)),
+            sd.testing.costs = sd(symp.demand+asymp.demand+(tests*3.5*100)),
+            mean.isolation.on = mean(cum.iso.on),
+            sd.testing.costs = sd(cum.iso.on),
+            mean.quarantine.on = mean(cum.qua.on),
+            sd.quarantine.costs = sd(cum.qua.on),
+            mean.housing.cost = mean((cum.iso.on + cum.qua.on)*50),
+            sd.housing.cost = sd((cum.iso.on + cum.qua.on)*50),
+            mean.class.days.missed = mean(cum.iso.on + cum.qua.on + cum.iso.off + cum.qua.off),
+            sd.class.days.missed = sd(cum.iso.on + cum.qua.on + cum.iso.off + cum.qua.off),
+            mean.community.foi = mean((cum.cases.on+cum.cases.off)*(1/6)),
+            sd.community.foi = sd((cum.cases.on+cum.cases.off)*(1/6))) %>% 
+  distinct()
+write.csv(tab, "tabulated.csv")
 ```
 
