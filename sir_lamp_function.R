@@ -83,7 +83,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   sympt.pcr <- newSymptReported.on + newSymptReported.off
   
   avail.tests <- tests * pooling
-    
+    if(0 %in% apply(out[,c(1:5,7:11)],1,sum)) browser()
     atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
     tested <- atests
     for (i in 1:sims){

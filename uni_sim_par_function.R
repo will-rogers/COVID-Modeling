@@ -48,8 +48,10 @@ uni_sims_par <- function(tst = 500,
                       "days.to.isolate" = days.to.isolate,
                       "days.to.quarantine" = days.to.quarantine)
   vars <- vars %>%
-    filter(R0.on == R0.off,
-           days.to.isolate == days.to.quarantine)
+    filter(R0.on == R0.off &
+             days.to.isolate == days.to.quarantine &
+             community.intro.daily.on == community.intro.daily.off &
+             community.prob.daily.on == community.prob.daily.off)
   if (is.null(ncores)){
   output <- rbindlist(apply(vars,1,FUN=function(x) uni_sim(tst = x[1], 
                                                            compliance = x[2], 
