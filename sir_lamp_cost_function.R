@@ -28,14 +28,14 @@
 # show for testing or dont comply with isolation
 #care.seeking is the proportion of students who seek care once symptomatic
 
-sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on, newSympt2.on, beta_vec.on = beta_vec.on,
+sir_lamp_cost <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on, newSympt2.on, beta_vec.on = beta_vec.on,
                       S.off,E.off,I1.off,I2.off,R.off,N.off,newSympt1.off, newSympt2.off, beta_vec.off = beta_vec.off, 
-                      theta, gamma_I1I2, gamma_I2R, delta.t=1, tests, ppn_sympt=ppn_sympt, 
+                      theta, gamma_I1I2, gamma_I2R, delta.t=1, test_budget = 1E6, test_proportion = 0, ppn_sympt = ppn_sympt, 
                       contacts.on = 5, contacts.off = 5, compliance = 1, care.seeking = 1,  
                       atest.wait.3,atest.wait.2,atest.wait.1,contact.wait.3,contact.wait.2,contact.wait.1,
                       test.scenario = c("2 Days","1 Day","No Delay"), sens.pcr = .99, spec.pcr = .99, 
                       sens.lamp = .8, spec.lamp = .99, lamp.diagnostic = F, contact.tracing.limit = 100, 
-                      intro.on, intro.off, pooling, pooling.multi, on.campus.prop) {
+                      intro.on, intro.off, pooling, pooling.multi, on.campus.prop, cost.LAMP, cost.PCR) {
   ts <- ts
   dN_SE.on <- rbinom(n=sims,size=S.on,
                      prob=1-exp(-beta_vec.on*(I1.on+I2.on+I1.off+I2.off)/(N.on+N.off)*delta.t)) + intro.on # add random introductions
@@ -61,8 +61,14 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   newSympt2.on <- newSympt1.on
   newSympt1.on <- dN_I1I2.on
   
+  tests.on <- round((test_budget * (1-test_proportion) * on.campus.prop)/cost.PCR)
+  tests.off <- round((test_budget * (1-test_proportion) * (1-on.campus.prop))/cost.PCR)
+  tests.surv <- round((test_budget * test_proportion)/cost.LAMP)
+  
   newSymptReportedTrue.on <- rbinom(sims, newSympt2.on, ppn_sympt) # randomly draw symtomatic individuals
   newSymptReported.on <- floor(newSymptReportedTrue.on*care.seeking*(1-(1-sens.pcr)))
+  
+  newSymptReported.on <- ifelse(newSymptReported.on > tests.on, tests.on, newSymptReported.on)
   
   R.on. <- R.on + dN_I2R.on
   
@@ -76,45 +82,52 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   newSymptReportedTrue.off <- rbinom(sims, newSympt2.off, ppn_sympt) # randomly draw symtomatic individuals
   newSymptReported.off <- floor(newSymptReportedTrue.off*care.seeking*(1-(1-sens.pcr)))
   
+  newSymptReported.off <- ifelse(newSymptReported.off > tests.off, tests.off, newSymptReported.off)
+  
   R.off. <- R.off + dN_I2R.off
   
   out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_I1I2.on, 
                 S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_I1I2.off ) # assume that I1->I2 is when cases become detectable
+  
+  
   sympt.pcr <- newSymptReported.on + newSymptReported.off
   
-  avail.tests <- tests * pooling
-    if(0 %in% apply(out[,c(1:5,7:11)],1,sum)) browser()
-    atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
-    tested <- atests
+  spare.on <- ifelse(tests.on > newSymptReported.on, tests.on - newSymptReported.on, 0)
+  spare.off <- ifelse(tests.off > newSymptReported.off, tests.off - newSymptReported.off, 0)
+  
+  avail.tests <- (tests.surv + spare.on + spare.off) * pooling
+  if(0 %in% apply(out[,c(1:5,7:11)],1,sum)) browser()
+  atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
+  tested <- atests
+  for (i in 1:sims){
+    for (j in 1:10){
+      if (j %in% c(3,4,8,9)){
+        tested[i,j] <- rbinom(1, atests[i,j], (((pooling-1)*-pooling.multi)+sens.lamp)*compliance)
+      }
+      if (j %in% c(1,2,5,6,7,10)){
+        tested[i,j] <- rbinom(1, atests[i,j], (1-((pooling-1)*-pooling.multi+spec.lamp))*compliance)
+      }
+    }
+  }
+  
+  asymp.pcr <- rep(0, sims)
+  
+  tested. <- tested
+  if (lamp.diagnostic == F) {
     for (i in 1:sims){
       for (j in 1:10){
         if (j %in% c(3,4,8,9)){
-          tested[i,j] <- rbinom(1, atests[i,j], (((pooling-1)*-pooling.multi)+sens.lamp)*compliance)
+          tested.[i,j] <- rbinom(1, tested[i,j], (1-((1-sens.pcr))))
         }
         if (j %in% c(1,2,5,6,7,10)){
-          tested[i,j] <- rbinom(1, atests[i,j], (1-((pooling-1)*-pooling.multi+spec.lamp))*compliance)
+          tested.[i,j] <- rbinom(1, tested[i,j], (1-(spec.pcr)))
         }
       }
     }
-    
-    asymp.pcr <- rep(0, sims)
-    
-    tested. <- tested
-    if (lamp.diagnostic == F) {
-      for (i in 1:sims){
-        for (j in 1:10){
-          if (j %in% c(3,4,8,9)){
-            tested.[i,j] <- rbinom(1, tested[i,j], (1-((1-sens.pcr))))
-          }
-          if (j %in% c(1,2,5,6,7,10)){
-            tested.[i,j] <- rbinom(1, tested[i,j], (1-(spec.pcr)))
-          }
-        }
-      }
-      asymp.pcr <- apply(tested., 1, sum)
-    }
+    asymp.pcr <- apply(tested., 1, sum)
+  }
   
-    
+  
   cases.caught <- apply(tested.[,c(3,4,8,9)], 1, sum) + newSymptReported.on + newSymptReported.off
   
   sympt.isolate <- matrix(0,nr=sims,nc=10) # storage for symptomatic cases to isolate
@@ -187,7 +200,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                                     theta, gamma_I1I2, gamma_I2R,
                                     beta_vec.on, beta_vec.off)
   contact.wait.1 <- contacts
-
+  
   if(test.scenario == "2 Days") {
     out[,c(1:5,7:11)] <- pmax(out[,c(1:5,7:11)] - sympt.isolate - (contact.wait.3) - (atest.wait.3),0)
   }
@@ -204,12 +217,13 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
     out <- 0
     print("Need correct delay interval")
   }
-
+  
   out <- cbind(out, atests, newSympt1.on, newSympt1.off, newSympt2.on, newSympt2.off, newSymptReported.on, newSymptReported.off,
                contacts, tot.contacts, avail.tests, atests.isolate,
                sympt.isolate, newSymptReportedTrue.on, newSymptReportedTrue.off, 
                atest.wait.3,atest.wait.2,atest.wait.1,
-               contact.wait.3,contact.wait.2,contact.wait.1, sympt.pcr, asymp.pcr, cases.caught
+               contact.wait.3,contact.wait.2,contact.wait.1, sympt.pcr, asymp.pcr, cases.caught,
+               tests.on,tests.off,tests.surv
   )
   # store all states -- SIR states plus tested, reported, contacts
 }

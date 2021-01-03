@@ -1,7 +1,7 @@
 #### University Simulation Functions
 
 
-uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both"),
+uni_sim_cost <- function(test_budget = 1E6, test_proportion = 0, test.timeline = c("Initial", "Sustained", "Both"),
                     compliance = 0.75, init.prev = .03, ppn_sympt = .8, 
                     care.seeking = 0.5, R0.on = 3, R0.off = 1.5, 
                     test.scenario = c("2 Days","1 Day","No Delay"),
@@ -13,7 +13,8 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
                     immunity = 0.1, N0 = 16750, on.campus.prop = .25, 
                     contact.tracing.limit = 100, pooling = 4, pooling.multi = 1,
                     days = 100, sims = 200,
-                    days.to.isolate = 10, days.to.quarantine = 10){
+                    days.to.isolate = 10, days.to.quarantine = 10,
+                    cost.LAMP = 3.5, cost.PCR = 12.5){
   
   Tsim <- as.numeric(days)        # time to simulate over, we only care about start
   sims <- as.numeric(sims)    # number of simulations
@@ -23,7 +24,10 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   care.seeking <- as.numeric(care.seeking) 
   init.prev <- as.numeric(init.prev)
   days <- as.numeric(days)
-  tst <- as.numeric(tst)
+  test_budget <- as.numeric(test_budget)
+  test_proportion <- as.numeric(test_proportion)
+  cost.LAMP <- as.numeric(cost.LAMP)
+  cost.PCR <- as.numeric(cost.PCR)
   test.scenario <- test.scenario
   sens.pcr <- as.numeric(sens.pcr)
   spec.pcr <- as.numeric(spec.pcr)
@@ -99,6 +103,9 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   symp.pcr <- matrix(0,1,sims)
   asymp.pcr <- matrix(0,1,sims)
   cases.caught <- matrix(0,1,sims)
+  tests.on <- matrix(0,1,sims)
+  tests.off <- matrix(0,1,sims)
+  tests.diag <- matrix(0,1,sims)
   N.off <- S.off+E.off+I1.off+I2.off+R.off
   
   atest.wait.3 <- array(0,c(1,sims,10))
@@ -113,38 +120,39 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   
   # distancing_reduction <- 0.5 # if trigger is crossed, NPIs are imposed and transmission is reduced by this fraction
   # qi_trigger <- numeric(sims)
-  
+  test_budget <- test_budget/days
   for(ts in 2:Tsim){
-    if(test.timeline == "Initial" & ts > 20){
-      tests = 0
-    }
-    if(test.timeline == "Initial" & ts <= 20){
-      tests = floor(days*tst/20) 
-    }
-    
-    if(test.timeline == "Sustained"){
-      tests = floor(tst)
-    }
-    
-    if(test.timeline == "Both" & ts > 20){
-      tests = floor((days*tst/20)/2)
-    }
-    if(test.timeline == "Both" & ts <= 20){
-      tests = floor((days*tst/2)/(days-20))
-    }
-    out <- sir_lamp(sims, 
+    # if(test.timeline == "Initial" & ts > 20){
+    #   tests = 0
+    # }
+    # if(test.timeline == "Initial" & ts <= 20){
+    #   tests = floor(days*tst/20) 
+    # }
+    # 
+    # if(test.timeline == "Sustained"){
+    #   tests = floor(tst)
+    # }
+    # 
+    # if(test.timeline == "Both" & ts > 20){
+    #   tests = floor((days*tst/20)/2)
+    # }
+    # if(test.timeline == "Both" & ts <= 20){
+    #   tests = floor((days*tst/2)/(days-20))
+    # }
+    out <- sir_lamp_cost(sims, 
                     S.on[ts-1,], E.on[ts-1,], I1.on[ts-1,], I2.on[ts-1,], R.on[ts-1,], 
                     N.on[ts-1,], sympt1.on[ts-1,], sympt2.on[ts-1,], beta_vec.on, 
                     S.off[ts-1,], E.off[ts-1,], I1.off[ts-1,], I2.off[ts-1,], R.off[ts-1,], 
                     N.off[ts-1,], sympt1.off[ts-1,], sympt2.off[ts-1,], beta_vec.off, 
-                    theta, gamma_I1I2, gamma_I2R, delta.t=1, tests, contacts.on = 5, contacts.off = 5,
+                    theta, gamma_I1I2, gamma_I2R, delta.t=1, test_budget = test_budget, test_proportion = test_proportion, 
+                    contacts.on = 5, contacts.off = 5,
                     ppn_sympt = ppn_sympt, compliance = compliance, care.seeking = care.seeking,
                     atest.wait.3[ts-1,,],atest.wait.2[ts-1,,],atest.wait.1[ts-1,,],
                     contact.wait.3[ts-1,,], contact.wait.2[ts-1,,],contact.wait.1[ts-1,,],
                     test.scenario, sens.pcr = sens.pcr, spec.pcr = spec.pcr, 
                     sens.lamp = sens.lamp, spec.lamp = spec.lamp, lamp.diagnostic = lamp.diagnostic,
                     contact.tracing.limit = contact.tracing.limit, intro.on, intro.off, pooling,
-                    pooling.multi) # call to SIR step function above
+                    pooling.multi, on.campus.prop, cost.LAMP, cost.PCR) # call to SIR step function above
     S.on <- rbind(S.on,out[,1])  # update state
     E.on <- rbind(E.on,out[,2])  # update state
     I1.on <- rbind(I1.on,out[,3])  # update state
@@ -180,6 +188,9 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     symp.pcr <- rbind(symp.pcr, out[,132])
     asymp.pcr <- rbind(asymp.pcr, out[,133])
     cases.caught <- rbind(cases.caught, out[,134])
+    tests.on <- rbind(tests.on, out[,135])
+    tests.off <- rbind(tests.off, out[,136])
+    tests.diag <- rbind(tests.diag, out[,137])
     
     atest.wait.3 <- abind(atest.wait.3, array(out[,72:81], c(1,sims,10)), along = 1)
     atest.wait.2 <- abind(atest.wait.2, array(out[,82:91], c(1,sims,10)), along = 1)
@@ -219,7 +230,13 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
               "symp.pcr" = symp.pcr,
               "asymp.pcr" = asymp.pcr,
               "cases.caught" = cases.caught,
-              "tests"= matrix(tst,Tsim,sims),
+              "test_budget" = test_budget,
+              "test_proportion" = test_proportion,
+              "tests.on" = tests.on,
+              "tests.off" = tests.off,
+              "tests.diag" = tests.diag,
+              "cost.LAMP" = cost.LAMP, 
+              "cost.PCR" = cost.PCR,
               "compliance" = matrix(compliance,Tsim,sims),
               "init.prev"= matrix(init.prev,Tsim,sims),
               "ppn_sympt"= matrix(ppn_sympt,Tsim,sims),
