@@ -28,15 +28,15 @@ library(ggpubr)
 How do asymptomatic tests affect epidemic size?
 ```{r}
 set.seed(12345)
-output <- uni_sims_par(tst = c(0,250,500,750,1000,1250,1500,1750,2000), 
+output <- uni_sims_par(tst = c(0,500,1000,1500,2000,2500,3000,3500,4000), 
                        test.timeline = c("Sustained"),
                        compliance = 1, 
                        init.prev = .01, 
                        ppn_sympt = .5, 
                        care.seeking = 1, 
-                       R0.on = 2.5,  
-                       R0.off = 2.5, 
-                       test.scenario = "No Delay",
+                       R0.on = 3,  
+                       R0.off = 3, 
+                       test.scenario = c("No Delay", "1 Day", "2 Days"),
                        sens.pcr = .99, 
                        spec.pcr = .99, 
                        sens.lamp = c(.771), 
@@ -52,8 +52,8 @@ output <- uni_sims_par(tst = c(0,250,500,750,1000,1250,1500,1750,2000),
                        contact.tracing.limit = 0,
                        pooling = 1, 
                        pooling.multi = .1,
-                       days = 100, 
-                       sims = 200,
+                       days = 150, 
+                       sims = 50,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
                        ncores=4) # for comuptational efficiency, make null if you want
@@ -79,94 +79,87 @@ outa <- output %>%
          cum.qua.on = cumsum(quarantine.complying.on),
   )
 
-outa$tests.f <- factor(paste(outa$tests), levels = paste(seq(0,2000,by=250)), ordered = T)
+outa$tests.f <- factor(paste(outa$tests/200), levels = paste(seq(0,4000,by=500)/200), labels = paste0(seq(0,4000,by=500)/200,"%"), ordered = T)
+outa$test.scenario <- factor(paste(outa$test.scenario), levels = c("No Delay", "1 Day", "2 Days"), ordered = T)
 
 outa %>% 
   filter(day == max(day)) %>% 
-  group_by(tests.f) %>%
+  group_by(tests.f, sens.lamp, test.scenario) %>%
   summarize(mean = mean(cum.cases.on+cum.cases.off),
             upper = quantile(cum.cases.on+cum.cases.off, .975),
             lower = quantile(cum.cases.on+cum.cases.off, 0.025)) %>%
-  ggplot(aes(x = tests.f, y = mean/20000, color = tests.f, fill = tests.f)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper/20000, ymin=lower/20000), color = "black") +
-  labs(y="Cumulative Infections with 95% Quantile\n(Proportion of Total Population)") +
+  ggplot(aes(x = tests.f, y = mean/20000, color = test.scenario, fill = test.scenario, group = test.scenario)) +
+  geom_path(position = position_dodge(.3)) +
+  geom_point(position = position_dodge(.3)) +
+  geom_linerange(aes(ymax=upper/20000, ymin=lower/20000, group = factor(test.scenario)),position = position_dodge(.3)) +
+  labs(y="Epidemic Size",
+       x = "Average Population Tested Per Day") +
   theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  scale_fill_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  scale_color_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
-  scale_y_continuous(labels = scales::percent, n.breaks = 10)
+  scale_fill_viridis_d(name = "Testing Delay") +
+  scale_color_viridis_d(name = "Testing Delay") +
+  scale_y_continuous(labels = scales::percent, n.breaks = 10) +
+  rotate_x_text() 
 ```
 
-How does surveillance testing work? It catches active infections
-```{r}
-outa %>% 
-  filter(day == max(day)) %>% 
-  group_by(group,tests.f) %>%
-  summarize(prop = cum.cases.caught/cum.active) %>%
-  group_by(tests.f) %>%
-  summarize(mean = mean(prop),
-            upper = quantile(prop, 0.975),
-            lower = quantile(prop, 0.025)) %>%
-  ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Proportion of Daily Active Cases Discovered\nwith 95% Quantile",
-       x = "Testing Scenario") +
-  theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  scale_fill_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  scale_color_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
-  scale_y_continuous(labels = scales::percent, n.breaks = 10)
-```
+<!-- How does surveillance testing work? It catches active infections -->
+<!-- ```{r} -->
+<!-- outa %>%  -->
+<!--   group_by(day, group,tests.f,test.scenario) %>% -->
+<!--   summarize(prop = cum.cases.caught/cum.active) %>% -->
+<!--   group_by(tests.f,test.scenario) %>% -->
+<!--   summarize(mean = mean(prop, na.omit = T), -->
+<!--             upper = quantile(prop, 0.975, na.rm = T), -->
+<!--             lower = quantile(prop, 0.025, na.rm = T)) %>% -->
+<!-- ggplot(aes(x = tests.f, y = mean, color = test.scenario, fill = test.scenario, group = test.scenario)) + -->
+<!--   geom_path(position = position_dodge(.3)) + -->
+<!--   geom_point(position = position_dodge(.3)) + -->
+<!--   geom_linerange(aes(ymax=upper, ymin=lower, group = factor(test.scenario)),position = position_dodge(.3)) + -->
+<!--   labs(y="Active Cases Discovered", -->
+<!--        x = "Average Population Tested Per Day") + -->
+<!--   theme_classic() +  -->
+<!--   scale_fill_viridis_d(name = "Testing Delay") + -->
+<!--   scale_color_viridis_d(name = "Testing Delay") + -->
+<!--   scale_y_continuous(labels = scales::percent, n.breaks = 10) + -->
+<!--   rotate_x_text()  -->
+<!-- ``` -->
 
 How does surveillance testing affect PCR Demand?
 ```{r}
 a <- outa %>% 
   filter(day == max(day)) %>% 
-  group_by(tests.f) %>%
+  group_by(tests.f,test.scenario) %>%
  summarize(mean = mean(asymp.demand),
             upper = quantile(asymp.demand, 0.975),
             lower = quantile(asymp.demand, 0.025)) %>% 
-  ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Cumulative Confirmatory RT-qPCR\nwith 95% Quantile",
-       x = "Testing Scenario") +
+  ggplot(aes(x = tests.f, y = mean, color = test.scenario, fill = test.scenario, group = test.scenario)) +
+  geom_path(position = position_dodge(.3)) +
+  geom_point(position = position_dodge(.3)) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = factor(test.scenario)),position = position_dodge(.3)) +
+  labs(y="Epidemic Size",
+       x = "Average Population Tested Per Day") +
   theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  scale_fill_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  scale_color_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
-  scale_y_continuous(n.breaks = 10)
+  scale_fill_viridis_d(name = "Testing Delay") +
+  scale_color_viridis_d(name = "Testing Delay") +
+  scale_y_continuous(labels = scales::percent, n.breaks = 10) +
+  rotate_x_text() 
 b <- outa %>% 
   filter(day == max(day)) %>% 
-  group_by(tests.f) %>%
+  group_by(tests.f,test.scenario) %>%
  summarize(mean = mean(symp.demand),
             upper = quantile(symp.demand, 0.975),
             lower = quantile(symp.demand, 0.025)) %>% 
-  ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Cumulative Diagnostic RT-qPCR\nwith 95% Quantile",
-       x = "Testing Scenario") +
+  ggplot(aes(x = tests.f, y = mean, color = test.scenario, fill = test.scenario, group = test.scenario)) +
+  geom_path(position = position_dodge(.3)) +
+  geom_point(position = position_dodge(.3)) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = factor(test.scenario)),position = position_dodge(.3)) +
+  labs(y="Epidemic Size",
+       x = "Average Population Tested Per Day") +
   theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  scale_fill_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  scale_color_viridis_d(name = "Asymptomatic\nDaily Tests") +
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
-  scale_y_continuous(n.breaks = 10)
-ggarrange(a,b, common.legend = T, legend = "bottom")
+  scale_fill_viridis_d(name = "Testing Delay") +
+  scale_color_viridis_d(name = "Testing Delay") +
+  scale_y_continuous(labels = scales::percent, n.breaks = 10) +
+  rotate_x_text() 
+ggarrange(a,b, common.legend = T, nrow = 2, legend = "right")
 ```
 
 Percent of student days lost
@@ -196,14 +189,14 @@ outa %>%
 How does contact tracing alter epidemic
 ```{r}
 set.seed(12345)
-output <- uni_sims_par(tst = c(500), 
+output <- uni_sims_par(tst = c(0,1000,2000,4000), 
                        test.timeline = c("Sustained"),
-                       compliance = 1, 
+                       compliance = c(.5,1), 
                        init.prev = .01, 
                        ppn_sympt = .5, 
                        care.seeking = 1, 
-                       R0.on = 2.5,  
-                       R0.off = 2.5, 
+                       R0.on = 3,  
+                       R0.off = 3, 
                        test.scenario = "No Delay",
                        sens.pcr = .99, 
                        spec.pcr = .99, 
@@ -220,8 +213,8 @@ output <- uni_sims_par(tst = c(500),
                        contact.tracing.limit = seq(0,100,by = 25),
                        pooling = 1, 
                        pooling.multi = .1,
-                       days = 100, 
-                       sims = 200,
+                       days = 150, 
+                       sims = 50,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
                        ncores=NULL) # for comuptational efficiency, make null if you want
@@ -248,41 +241,41 @@ outb <- output %>%
   )
 
 outb$contact.tracing.limit <- factor(outb$contact.tracing.limit)
+outb$tests.f <- factor(outb$tests, levels = c(0,1000,2000,4000), labels = paste("Tests Per Day", c("0%", "5%", "10%","20%")))
 outb %>% 
   filter(day == max(day)) %>% 
-  group_by(contact.tracing.limit) %>%
+  group_by(contact.tracing.limit, compliance, tests.f) %>%
   summarize(mean = mean(cum.cases.on+cum.cases.off)/20000,
             upper = quantile(cum.cases.on+cum.cases.off, 0.975)/20000,
             lower = quantile(cum.cases.on+cum.cases.off, 0.025)/20000) %>%
-  ggplot(aes(x = contact.tracing.limit, y = mean, color = contact.tracing.limit, fill = contact.tracing.limit)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Cumulative Infections with 95% Quantile\n(Proportion of Total Population)",
-       x = "Testing Scenario") +
+  ggplot(aes(x = contact.tracing.limit, y = mean, color = compliance, fill = compliance, group = compliance)) +
+  geom_path(position = position_dodge(.3)) +
+  geom_point(position = position_dodge(.3)) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = compliance),position = position_dodge(.3)) +
+  labs(y="Epidemic Size",
+       x = "Daily Contact Tracing Limit") +
   theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  scale_fill_viridis_d(name = "Contact Tracing\nLimit") +
-  scale_color_viridis_d(name = "Contact Tracing\nLimit") +
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
-  scale_y_continuous(labels = scales::percent, n.breaks = 10)
+  scale_fill_viridis_d(name = "Compliance") +
+  scale_color_viridis_d(name = "Compliance") +
+  facet_grid(.~tests.f) +
+  scale_y_continuous(labels = scales::percent, n.breaks = 10) +
+  rotate_x_text() 
 ```
 
 ```{r}
 set.seed(12345)
-output <- uni_sims_par(tst = c(500), 
+output <- uni_sims_par(tst = c(2000), 
                        test.timeline = c("Sustained"),
-                       compliance = seq(0.5,1, by = 0.25), 
+                       compliance = c(0.5,1), 
                        init.prev = .01, 
                        ppn_sympt = .5, 
-                       care.seeking = seq(0.5,1, by = 0.25), 
-                       R0.on = 2.5,  
-                       R0.off = 2.5, 
-                       test.scenario = "No Delay",
+                       care.seeking = c(0.5,1), 
+                       R0.on = 3,  
+                       R0.off = 3, 
+                       test.scenario = c("No Delay", "1 Day", "2 Days"),
                        sens.pcr = .99, 
                        spec.pcr = .99, 
-                       sens.lamp = seq(0.5,1, by = 0.1), 
+                       sens.lamp = seq(0.6,.9, by = 0.1), 
                        spec.lamp = .98, 
                        lamp.diagnostic = F, 
                        community.intro.daily.on = 1, 
@@ -295,8 +288,8 @@ output <- uni_sims_par(tst = c(500),
                        contact.tracing.limit = 0,
                        pooling = 1, 
                        pooling.multi = .1,
-                       days = 100, 
-                       sims = 200,
+                       days = 150, 
+                       sims = 50,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
                        ncores=4) # for comuptational efficiency, make null if you want
@@ -323,45 +316,43 @@ outc <- output %>%
   )
 
 outc$compliance. <- factor(paste("Compliance =", outc$compliance), levels = paste0("Compliance = ", c(50,75,100),"%"), ordered = T)
+outc$test.scenario <- factor(outc$test.scenario, levels = c("No Delay", "1 Day", "2 Days"), ordered = T)
 outc$care.seeking. <- factor(paste0("Care Seeking = ", outc$care.seeking*100,"%"), levels = paste0("Care Seeking = ", c(50,75,100),"%"), ordered = T)
 outc$sens.lamp. <- factor(paste0(outc$sens.lamp*100, "%"), levels = paste0(c(50,60,70,80,90,100),"%"), ordered = T)
 
 outc %>% 
   filter(day == max(day)) %>% 
-  group_by(compliance.,care.seeking.,sens.lamp.) %>%
+  group_by(compliance.,care.seeking.,sens.lamp.,test.scenario) %>%
   summarize(mean = mean(cum.cases.on+cum.cases.off)/20000,
             upper = quantile(cum.cases.on+cum.cases.off, 0.975)/20000,
             lower = quantile(cum.cases.on+cum.cases.off, 0.025)/20000) %>%
   ggplot(aes(x = sens.lamp., y = mean, color = sens.lamp., fill = sens.lamp.)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Cumulative Infections with 95% Quantile\n(Proportion of Total Population)",
-       x = "Testing Scenario") +
+  geom_bar(aes(alpha = test.scenario), stat="identity", position = "dodge") +
+  geom_errorbar(aes(ymax=upper, ymin=lower, group = test.scenario), color = "black", position = "dodge") +
+  labs(y="Epidemic Size",
+       x = "Surveillance Sensitivity") +
   theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
-  scale_fill_viridis_d(name = "Surveillance\nSensitivity") +
-  scale_color_viridis_d(name = "Surveillance\nSensitivity") +
+  scale_fill_viridis_d(name = "Surveillance\nSensitivity", guide = F) +
+  scale_color_viridis_d(name = "Surveillance\nSensitivity", guide = F) +
+  scale_alpha_manual(name = "Testing Delay", values = c(1,.5,.25)) +
   facet_grid(compliance.~care.seeking.) +
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
   scale_y_continuous(labels = scales::percent, n.breaks = 10)
 ```
 
 ```{r}
 set.seed(12345)
-output <- uni_sims_par(tst = c(0,667,1429,2857,5000,10000,20000), 
+output <- uni_sims_par(tst = seq(0,5000,by = 500), 
                        test.timeline = c("Sustained"),
                        compliance = 1, 
                        init.prev = .01, 
                        ppn_sympt = .5, 
                        care.seeking = 1, 
-                       R0.on = 2.5,  
-                       R0.off = 2.5, 
+                       R0.on = 3,  
+                       R0.off = 3, 
                        test.scenario = "No Delay",
                        sens.pcr = .99, 
                        spec.pcr = .99, 
-                       sens.lamp = seq(0.5,1, by = 0.1), 
+                       sens.lamp = seq(0.6,.9, by = 0.1), 
                        spec.lamp = .98, 
                        lamp.diagnostic = F, 
                        community.intro.daily.on = 1, 
@@ -375,7 +366,7 @@ output <- uni_sims_par(tst = c(0,667,1429,2857,5000,10000,20000),
                        pooling = 1, 
                        pooling.multi = .1,
                        days = 100, 
-                       sims = 200,
+                       sims = 50,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
                        ncores=4) # for comuptational efficiency, make null if you want
@@ -402,33 +393,29 @@ outd <- output %>%
   )
 
 outd$sens.lamp. <- factor(paste0(outd$sens.lamp*100, "%"), levels = paste0(c(50,60,70,80,90,100),"%"), ordered = T)
-outd$test.interval <- factor(paste0(round(20000/outd$tests), " Days"), levels = c("Inf Days", "30 Days",  "14 Days",  "7 Days",   "4 Days",   "2 Days",   "1 Days" ), labels = c("None", "30 Days",  "14 Days",  "7 Days",   "4 Days",   "2 Days",   "1 Day" ), ordered = T)
 
 outd %>% 
   filter(day == max(day)) %>% 
-  group_by(sens.lamp.,test.interval) %>%
+  group_by(sens.lamp.,tests) %>%
   summarize(mean = mean(cum.cases.on+cum.cases.off)/20000,
             upper = quantile(cum.cases.on+cum.cases.off, 0.975)/20000,
             lower = quantile(cum.cases.on+cum.cases.off, 0.025)/20000) %>%
-  ggplot(aes(x = sens.lamp., y = mean, color = sens.lamp., fill = sens.lamp.)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Cumulative Infections with 95% Quantile\n(Proportion of Total Population)",
+  ggplot(aes(x = tests/20000, y = mean, color = sens.lamp., fill = sens.lamp.)) +
+  geom_line(aes(group = sens.lamp.)) +
+  geom_errorbar(aes(ymax=upper, ymin=lower, group = sens.lamp.)) +
+  labs(y="Epidemic Size",
        x = "Testing Scenario") +
   theme_classic() + 
   guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
   scale_fill_viridis_d(name = "Surveillance\nSensitivity") +
   scale_color_viridis_d(name = "Surveillance\nSensitivity") +
-  facet_grid(.~test.interval) +
-  theme(axis.text.x = element_blank(),
-        axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
-  scale_y_continuous(labels = scales::percent, n.breaks = 10)
+  scale_y_continuous(labels = scales::percent, n.breaks = 10) +
+  scale_x_continuous(labels = scales::percent, n.breaks = 10)
 ```
 
 ```{r}
 set.seed(12345)
-output <- uni_sims_par(tst = c(0), 
+output <- uni_sims_par(tst = c(2000), 
                        test.timeline = c("Sustained"),
                        compliance = 1, 
                        init.prev = c(.01,0.03,0.05), 
@@ -436,7 +423,7 @@ output <- uni_sims_par(tst = c(0),
                        care.seeking = 1, 
                        R0.on = c(2,2.25,2.5,2.75,3),  
                        R0.off = c(2,2.25,2.5,2.75,3), 
-                       test.scenario = "No Delay",
+                       test.scenario = c("No Delay", "1 Day", "2 Days"),
                        sens.pcr = .99, 
                        spec.pcr = .99, 
                        sens.lamp = .771, 
@@ -452,8 +439,8 @@ output <- uni_sims_par(tst = c(0),
                        contact.tracing.limit = 0,
                        pooling = 1, 
                        pooling.multi = .1,
-                       days = 100, 
-                       sims = 200,
+                       days = 150, 
+                       sims = 50,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
                        ncores=4) # for comuptational efficiency, make null if you want
@@ -481,27 +468,29 @@ oute <- output %>%
 
 oute$R0 <- factor(oute$R0.on, levels = c(2,2.25,2.5,2.75,3), ordered = T)
 oute$init.prev <- factor(paste0(oute$init.prev*100, "%"), levels = c("1%","3%","5%"), labels = paste("Prevalence =",c("1%","3%","5%")), ordered = T)
-oute$immunity <- factor(paste0(oute$immunity*100, "%"), levels = c("5%","10%","15%"), , labels = paste("Immunity =",c("5%","10%","15%")),ordered = T)
+oute$immunity <- factor(paste0(oute$immunity*100, "%"), levels = c("5%","10%","15%"), labels = paste("Immunity =",c("5%","10%","15%")),ordered = T)
+oute$test.scenario <- factor(oute$test.scenario, levels = c("No Delay", "1 Day", "2 Days"),ordered = T)
 
 oute %>% 
   filter(day == max(day)) %>% 
-  group_by(R0,init.prev,immunity) %>%
+  group_by(R0,init.prev,immunity,test.scenario) %>%
   summarize(mean = mean(cum.cases.on+cum.cases.off)/20000,
             upper = quantile(cum.cases.on+cum.cases.off, 0.975)/20000,
             lower = quantile(cum.cases.on+cum.cases.off, 0.025)/20000) %>%
-  ggplot(aes(x = R0, y = mean, color = R0, fill = R0)) +
-  geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
-  labs(y="Cumulative Infections with 95% Quantile\n(Proportion of Total Population)",
+  ggplot(aes(x = R0, y = mean, color = R0, fill = R0, group = test.scenario)) +
+  geom_bar(aes(alpha = test.scenario), stat="identity", position = "dodge") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black", position = "dodge") +
+  labs(y="Epidemic Size",
        x = "Testing Scenario") +
   theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
   scale_fill_viridis_d(name = bquote(R[0])) +
   scale_color_viridis_d(name = bquote(R[0])) +
+  scale_alpha_manual(name = "Testing Delay", values = c(1,.5,.25)) +
   facet_grid(immunity~init.prev) +
   theme(axis.text.x = element_blank(),
         axis.title.x = element_blank(),
-        axis.ticks.x = element_blank())+
+        axis.ticks.x = element_blank(),
+        legend.position = "bottom")+
   scale_y_continuous(labels = scales::percent, n.breaks = 10)
 ```
 
@@ -532,7 +521,7 @@ output <- uni_sims_par(tst = c(0),
                        contact.tracing.limit = 0,
                        pooling = 1, 
                        pooling.multi = .1,
-                       days = 100, 
+                       days = 150, 
                        sims = 200,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
@@ -587,14 +576,14 @@ outf %>%
 
 ```{r} 
 set.seed(12345)
-output <- uni_sims_par(tst = c(0,500,1000,2000), 
+output <- uni_sims_par(tst = c(0,1000,2000,4000), 
                        test.timeline = c("Initial", "Sustained", "Both"),
                        compliance = 1, 
                        init.prev = .01, 
                        ppn_sympt = .5, 
                        care.seeking = 1, 
-                       R0.on = 2.5,  
-                       R0.off = 2.5, 
+                       R0.on = 3,  
+                       R0.off = 3, 
                        test.scenario = "No Delay",
                        sens.pcr = .99, 
                        spec.pcr = .99, 
@@ -611,8 +600,8 @@ output <- uni_sims_par(tst = c(0,500,1000,2000),
                        contact.tracing.limit = 0,
                        pooling = 1, 
                        pooling.multi = .1,
-                       days = 100, 
-                       sims = 200,
+                       days = 150, 
+                       sims = 50,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
                        ncores=4) # for comuptational efficiency, make null if you want
@@ -637,7 +626,9 @@ outg <- output %>%
          cum.qua.off = cumsum(quarantine.complying.off),
          cum.qua.on = cumsum(quarantine.complying.on),
   )
-outg$tests <- factor(paste("Tests =", outg$tests), levels = paste("Tests =", c(0,500,1000,2000)), ordered = T)
+outg$tests <- factor(outg$tests, levels = c(0,1000,2000,4000), labels = paste0("Tests Per Day ", c("0%", "5%", "10%", "20%")), ordered = T)
+outg$test.timeline <- factor(outg$test.timeline, levels =  c("Initial", "Sustained", "Both"),
+                           labels = c("Initial Effort", "Sustained Effort", "Front-Loaded Effort"), ordered = T)
 outg %>% 
   group_by(day, tests, test.timeline) %>%
   summarize(mean = mean(cum.cases.on+cum.cases.off)/20000,
@@ -646,12 +637,11 @@ outg %>%
   ggplot(aes(x = day, y = mean, color = test.timeline, fill = test.timeline)) +
   geom_line() +
   geom_ribbon(aes(ymax=upper, ymin=lower), color = NA, alpha = 0.25) +
-  labs(y="Cumulative Infections with 95% Quantile\n(Proportion of Total Population)",
+  labs(y="Epidemic Size",
        x = "Day of Semester") +
   theme_classic() + 
   scale_fill_viridis_d(name = "Testing\nTimeline") +
   scale_color_viridis_d(name = "Testing\nTimeline") +
   facet_grid(.~tests) +
-  scale_y_continuous(labels = scales::percent, n.breaks = 10) +
-  scale_y_continuous(n.breaks = 4)
+  scale_y_sqrt(labels = scales::percent, n.breaks = 10) 
 ```

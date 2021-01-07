@@ -1244,17 +1244,15 @@ ggplot(best.case, mapping = aes(x = mean.cost/20000, y = test_proportion, color 
   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
   rotate_x_text() 
 # 
-# ggplot(df., 
+# ggplot(df.,
 #        aes(x = test_proportion, y = ratio, color = factor(test_budget*150/1E6))) +
 #   geom_line() +
 #   theme_classic() +
-#   scale_color_viridis_d(name = "Testing\nInvestment\n(in Millions)", 
-#                        option = "C",
-#                        start = .1) +
+#   scale_color_viridis_d(name = "Testing\nInvestment\n(in Millions)",
+#                        option = "C") +
 #   scale_fill_viridis_d(name = "Testing\nInvestment\n(in Millions)",
-#                        option = "C",
-#                        start = .1) +
-#   labs(x = "Percent Surveillance in Testing Strategy", 
+#                        option = "C") +
+#   labs(x = "Percent Surveillance in Testing Strategy",
 #        y = "Ratio of Cases to Cost") +
 #   facet_grid(compliance~sens.lamp) +
 #   rotate_x_text() +
@@ -1265,7 +1263,7 @@ beepr::beep(1)
 ```
 ```{r}
 set.seed(12345)
-out.. <- uni_sims_cost_par(test_budget = seq(1E5,2E6, length.out = 5),
+out.. <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 5),
                          test_proportion = seq(0,1,by = .2),
                          test.timeline = "Sustained",
                          compliance = 1, 
@@ -1275,7 +1273,7 @@ out.. <- uni_sims_cost_par(test_budget = seq(1E5,2E6, length.out = 5),
                          R0.on = 3,  R0.off = 3, 
                          test.scenario = c("No Delay"),
                          sens.pcr = .99, spec.pcr = .99, 
-                         sens.lamp = c(.5, .98), spec.lamp = .98, 
+                         sens.lamp = c(.5, .99), spec.lamp = .98, 
                          lamp.diagnostic = F, 
                          community.intro.daily.on = 1, community.prob.daily.on =0.1,
                          community.intro.daily.off = 1, community.prob.daily.off =0.1,
@@ -1287,8 +1285,8 @@ out.. <- uni_sims_cost_par(test_budget = seq(1E5,2E6, length.out = 5),
                          days = 150, sims = 5,
                          days.to.isolate = 10,
                          days.to.quarantine = 10,
-                         cost.LAMP = c(1,10,100), 
-                         cost.PCR = 10,
+                         cost.LAMP = c(3.5,12.5,25), 
+                         cost.PCR = 12.5,
                          ncores=4)
 
 df.. <- out.. %>%
@@ -1335,8 +1333,8 @@ df.. <- out.. %>%
 
 df..$sens.lamp <- factor(df..$sens.lamp, levels = unique(df..$sens.lamp), labels = paste0("Sensitivity = ", unique(df..$sens.lamp) * 100, "%"))
 df..$compliance <- factor(df..$compliance, levels = rev(unique(df..$compliance)), labels = rev(paste0("Compliance = ", unique(df..$compliance))))
-df..$cost.LAMP <- factor(df..$cost.LAMP, levels = c(1,10,100), labels = c("Cost Ratio = 1:10", "Cost Ratio = 1:1", "Cost Ratio = 10:1"), ordered = T)
-ggplot(df.., 
+df..$cost.LAMP <- factor(df..$cost.LAMP, levels = c(3.5,12.5,25), labels = c("Cost = 3.5:12.5", "Cost = 12.5:12.5", "Cost = 25:12.5"), ordered = T)
+a <- ggplot(df.., 
        aes(x = test_proportion, y = mean.cases/20000, ymax = high.cases/20000, ymin = high.cases/20000, color = factor(test_budget*150/1E6))) +
   geom_line() +
   geom_ribbon(color=NA,alpha = 0.5) +
@@ -1352,7 +1350,25 @@ ggplot(df..,
   facet_grid(sens.lamp~cost.LAMP) +
   scale_x_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10)
-
+ratio <- rep(seq(0,1,by=0.001),3)
+budget <- rep(2E6,length(ratio))/150
+cost.ratio <- rep(c(3.50,12.50,25), length(seq(0,1,by=0.001)))
+LAMP.tests <- round(budget*(ratio)/cost.ratio)
+PCR.tests <- round(budget*(1-ratio)/12.50)
+df.simple <- data.frame(budget = rep(budget,2), ratio= rep(ratio,2), cost.ratio= rep(cost.ratio,2), tests= c(PCR.tests,LAMP.tests), label = rep(c("PCR", "LAMP"), each = length(ratio)))
+df.simple$cost.ratio.f <- factor(df.simple$cost.ratio, levels = c(3.50,12.50,25), labels = c("Cost = 3.5:12.5", "Cost = 12.5:12.5", "Cost = 25:12.5"))
+b <- ggplot(df.simple, aes(x = ratio, y = tests/20000, color = label)) +
+  geom_line() +
+  facet_grid(.~cost.ratio.f) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
+  scale_color_viridis_d(name = "Test Type",
+                        labels = c("Screening", "Diagnostic")) +
+  theme_classic() +
+  rotate_x_text() +
+  labs(y = "Testing Frequency",
+       x = "Percent Budget to Screening")
+ggarrange(a,b,common.legend = F, nrow = 2, labels = c("A", "B"), heights = c(1,.6))
 ```
 
 ```{r}
@@ -1379,7 +1395,7 @@ out <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 15),
                          on.campus.prop = .25, 
                          contact.tracing.limit = 0,
                          pooling = c(1,2,4), pooling.multi = .05,
-                         days = 150, sims = 25,
+                         days = 150, sims = 50,
                          days.to.isolate = 10,
                          days.to.quarantine = 10,
                          cost.LAMP = 3.50, 
