@@ -31,7 +31,7 @@ library(ggpubr)
 set.seed(12345)
 output <- uni_sims_par(tst = c(0,500,1000,2000,4000), 
                        test.timeline = c("Sustained"),
-                       compliance = 1, 
+                       compliance = c(0.5,1), 
                        init.prev = .01, 
                        ppn_sympt = .5, 
                        care.seeking = 1, 
@@ -57,7 +57,7 @@ output <- uni_sims_par(tst = c(0,500,1000,2000,4000),
                        sims = 200,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
-                       ncores=4) # for comuptational efficiency, make null if you want
+                       ncores=NULL) # for comuptational efficiency, make null if you want
 
 outa <- output %>%
   group_by(group) %>%
@@ -78,21 +78,32 @@ outa <- output %>%
          cum.iso.off = cumsum(isolation.complying.off),
          cum.qua.off = cumsum(quarantine.complying.off),
          cum.qua.on = cumsum(quarantine.complying.on),
+         cum.cases.caught = cumsum(cases.caught),
   )
 
 outa$tests.f <- factor(outa$tests, levels = c(0,500,1000,2000,4000), labels = c("0%", "2.5%", "5%", "10%", "20%"), ordered = T)
 outa$sens.lamp <- factor(outa$sens.lamp, levels = unique(outa$sens.lamp), labels = paste0(unique(outa$sens.lamp) * 100, "%"))
+outa$compliance <- factor(paste("Compliance =", outa$compliance), levels = paste("Compliance =",c("50%","100%")), ordered = T)
+
+outa %>%
+  filter(day == max(day)) %>%
+  group_by(tests,sens.lamp) %>%
+  summarize(mean = mean(cum.cases.caught/cum.active),
+            upper = quantile(cum.cases.caught/cum.active, .975),
+            lower = quantile(cum.cases.caught/cum.active, 0.025)) %>% 
+  filter(sens.lamp %in% c("75%")) 
 
 a <- outa %>% 
-  filter(day == max(day)) %>% 
-  group_by(tests.f, sens.lamp) %>%
-  summarize(mean = mean(cum.cases.on+cum.cases.off),
-            upper = quantile(cum.cases.on+cum.cases.off, .975),
-            lower = quantile(cum.cases.on+cum.cases.off, 0.025)) %>%
-  ggplot(aes(x = tests.f, y = mean/20000, color = tests.f, fill = tests.f, group = sens.lamp)) +
-  geom_bar(aes(alpha = sens.lamp), position = "dodge", stat="identity") +
-  geom_linerange(aes(ymax=upper/20000, ymin=lower/20000, group = sens.lamp), color = "black", position = position_dodge(.9), stat="identity", ) +
-  geom_linerange(aes(ymax=upper/20000, ymin=lower/20000, group = sens.lamp, linetype = sens.lamp), color = "black", position = position_dodge(.9), stat="identity", key_glyph = "path") +
+  filter(day == max(day),
+         compliance == "Compliance = 100%"
+         ) %>% 
+  group_by(tests.f, sens.lamp, compliance) %>%
+  summarize(mean = mean(cum.cases.on+cum.cases.off)/20000,
+            upper = quantile(cum.cases.on+cum.cases.off, .975)/20000,
+            lower = quantile(cum.cases.on+cum.cases.off, 0.025)/20000) %>%
+  ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f, group = sens.lamp)) +
+  geom_col(aes(alpha = sens.lamp), position = position_dodge(.75), stat="identity", width=.75) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = sens.lamp), color = "black", position = position_dodge(.75), stat="identity", width=.75) +
   labs(y="Epidemic Size") +
   theme_classic() + 
   scale_fill_viridis_d(name = "Average Population\nScreened Per Day") +
@@ -101,19 +112,19 @@ a <- outa %>%
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank(),
         legend.key.size = unit(.5, 'cm'))+
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
-  scale_alpha_discrete(name = "Sensitivity") +
-  scale_linetype_manual(values = c(4,2,1),name = "Sensitivity") 
+  scale_y_continuous(labels = scales::percent_format(), n.breaks = 10) +
+  scale_alpha_discrete(name = "Sensitivity") 
 b <- outa %>% 
-  filter(day == max(day)) %>% 
+  filter(day == max(day), 
+         compliance == "Compliance = 100%"
+         ) %>% 
   group_by(tests.f, sens.lamp) %>%
   summarize(mean = mean(symp.demand),
             upper = quantile(symp.demand, .975),
             lower = quantile(symp.demand, 0.025)) %>%
   ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f, group = sens.lamp)) +
-  geom_bar(aes(alpha = sens.lamp), position = "dodge", stat="identity") +
-  geom_linerange(aes(ymax=upper, ymin=lower, group = sens.lamp), color = "black", position = position_dodge(.9), stat="identity") +
-  geom_linerange(aes(ymax=upper/20000, ymin=lower/20000, group = sens.lamp, linetype = sens.lamp), color = "black", position = position_dodge(.9), stat="identity", key_glyph = "path") +
+  geom_col(aes(alpha = sens.lamp), position = position_dodge(.75), stat="identity", width=.75) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = sens.lamp), color = "black", position = position_dodge(.75), stat="identity", width=.75) +
   labs(y="Diagnostic Tests") +
   theme_classic() + 
   scale_fill_viridis_d(name = "Average Population\nScreened Per Day") +
@@ -122,19 +133,20 @@ b <- outa %>%
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank(),
         legend.key.size = unit(.5, 'cm'))+
-  scale_linetype_manual(values = c(4,2,1),name = "Sensitivity") +
+  # scale_linetype_manual(values = c(4,2,1),name = "Sensitivity") +
   scale_y_continuous(n.breaks = 10)
 c <- outa %>% 
-  filter(day == max(day)) %>% 
-  group_by(tests.f, sens.lamp) %>%
+  filter(day == max(day),
+         compliance == "Compliance = 100%"
+         ) %>% 
+  group_by(tests.f, sens.lamp, compliance) %>%
   summarize(mean = mean(asymp.demand),
             upper = quantile(asymp.demand, .975),
             lower = quantile(asymp.demand, 0.025)) %>%
   ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f, group = sens.lamp)) +
-  geom_bar(aes(alpha = sens.lamp), position = "dodge", stat="identity") +
-  geom_linerange(aes(ymax=upper, ymin=lower), color = "black", position = position_dodge(.9), stat="identity") +
-  geom_linerange(aes(ymax=upper/20000, ymin=lower/20000, group = sens.lamp, linetype = sens.lamp), color = "black", position = position_dodge(.9), stat="identity", key_glyph = "path") +
-  labs(y="Confirmatory Tests") +
+  geom_col(aes(alpha = sens.lamp), position = position_dodge(.75), stat="identity", width=.75) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = sens.lamp), color = "black", position = position_dodge(.75), stat="identity", width=.75) +
+  labs(y="Diagnostic\nFollow-up Tests") +
   theme_classic() + 
   scale_fill_viridis_d(name = "Average Population\nScreened Per Day") +
   scale_color_viridis_d(name = "Average Population\nScreened Per Day") +
@@ -143,33 +155,55 @@ c <- outa %>%
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank(),
         legend.key.size = unit(.5, 'cm'))+
-  scale_linetype_manual(values = c(4,2,1),name = "Sensitivity") +
-  scale_y_continuous(n.breaks = 10)
+  # scale_linetype_manual(values = c(4,2,1),name = "Sensitivity") +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1L)) 
 outa$sens.lampf <- paste("Sensitivity =", outa$sens.lamp)
-d <- outa %>% 
-  group_by(day, tests.f, sens.lamp) %>%
-  summarize(mean = mean(active.inf.on+active.inf.off)/20000,
-            upper = quantile(active.inf.on+active.inf.off, 0.975)/20000,
-            lower = quantile(active.inf.on+active.inf.off, 0.025)/20000) %>%
-  ggplot(aes(x = day, y = mean, color = tests.f, fill = tests.f, linetype = sens.lamp)) +
-  geom_line(aes(alpha = sens.lamp), size = 1) +
-  labs(y="Prevalence",
-       x = "Day of Semester") +
-  theme_classic() + 
-  scale_fill_viridis_d(name = "Screening Tests") +
-  scale_color_viridis_d(name = "Screening Tests") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
-  # facet_grid(.~sens.lampf)+
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
-  scale_linetype_manual(values = c(4,2,1)) +
-  scale_alpha_manual(values = c(.5,.75,1))
-ggarrange(ggarrange(a,b,c, common.legend = T, legend = "bottom", nrow = 1, labels = c("A","B","C")), d, nrow=2,labels = c(NA,"D"), legend = "none")
+# d <- outa %>% 
+#   group_by(day, tests.f, sens.lamp) %>%
+#   summarize(mean = mean(active.inf.on+active.inf.off)/20000,
+#             upper = quantile(active.inf.on+active.inf.off, 0.975)/20000,
+#             lower = quantile(active.inf.on+active.inf.off, 0.025)/20000) %>%
+#   ggplot(aes(x = day, y = mean, color = tests.f, fill = tests.f, linetype = sens.lamp)) +
+#   geom_line(aes(alpha = sens.lamp), size = 1) +
+#   labs(y="Prevalence",
+#        x = "Day of Semester") +
+#   theme_classic() + 
+#   scale_fill_viridis_d(name = "Screening Tests") +
+#   scale_color_viridis_d(name = "Screening Tests") +
+#   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
+#   # facet_grid(.~sens.lampf)+
+#   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
+#   scale_linetype_manual(values = c(4,2,1)) +
+#   scale_alpha_manual(values = c(.5,.75,1))
+d <- outa %>%
+  filter(day == max(day)) %>%
+  group_by(tests.f,sens.lamp,compliance) %>%
+  summarize(mean = mean(cum.cases.caught/(cum.cases.on+cum.cases.off)),
+            upper = quantile(cum.cases.caught/(cum.cases.on+cum.cases.off), .975),
+            lower = quantile(cum.cases.caught/(cum.cases.on+cum.cases.off), 0.025)) %>%
+  ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f, alpha = sens.lamp, group = factor(sens.lamp))) +
+  geom_point(stat = "identity", position = position_dodge(.9)) +
+  geom_linerange(aes(ymax = upper, ymin = lower), position = position_dodge(.9), color = "black", alpha = 1) +
+  theme_classic() +
+  scale_fill_viridis_d(name = "Sensitivity") +
+  scale_color_viridis_d(name = "Sensitivity") +
+  rotate_x_text() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1L)) +
+  facet_grid(.~compliance) +
+  labs(x = "Average Population Tested Per Day",
+       y = "Infectious Cases\nDetected") +
+  theme(axis.text.x = element_blank(),
+        axis.title.x = element_blank(),
+        axis.ticks.x = element_blank(),
+        legend.key.size = unit(.5, 'cm'))
+ggarrange(ggarrange(a,c, common.legend = T, legend = "bottom", nrow = 1, labels = c("A","B"), widths = c(2,1)), d, nrow=2,labels = c(NA,"C"), legend = "none")
+top.row <- ggarrange(a,b,c, common.legend = T, legend = "bottom", nrow = 1, labels = c("A","B","C"), align = "hv")
 ```
 
 
 ```{r}
 set.seed(12345)
-output <- uni_sims_par(tst = seq(0, 5000, length.out = 21), 
+output.b <- uni_sims_par(tst = seq(0, 4000, length.out = 21), 
                        test.timeline = c("Sustained"),
                        compliance = c(.5,1), 
                        init.prev = .01, 
@@ -180,7 +214,7 @@ output <- uni_sims_par(tst = seq(0, 5000, length.out = 21),
                        test.scenario = "No Delay",
                        sens.pcr = .99, 
                        spec.pcr = .99, 
-                       sens.lamp = seq(.6, .9, length.out = 4), 
+                       sens.lamp = seq(.6, .9, length.out = 3), 
                        spec.lamp = .98, 
                        lamp.diagnostic = F, 
                        community.intro.daily.on = 1, 
@@ -197,22 +231,44 @@ output <- uni_sims_par(tst = seq(0, 5000, length.out = 21),
                        sims = 200,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
-                       ncores=4) # for comuptational efficiency, make null if you want
+                       ncores=7) # for comuptational efficiency, make null if you want
+```
 
-outb <- output %>%
+
+```{r}
+outb <- output.b %>%
   group_by(group) %>%
   mutate(cum.cases.on = cumsum(new.cases.on),
          cum.active = cumsum(active.inf.off+active.inf.on),
          cum.cases.off = cumsum(new.cases.off),
-         cum.cases.caught = cumsum(cases.caught)
+         cum.cases.caught = cumsum(cases.caught),
+         cum.infections.removed = cumsum(cases.removed),
+         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+         symp.demand = cumsum(symp.pcr),
+         asymp.demand = cumsum(asymp.pcr),
+         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
+         cum.iso.on = cumsum(isolation.complying.on),
+         cum.iso.off = cumsum(isolation.complying.off),
+         cum.qua.off = cumsum(quarantine.complying.off),
+         cum.qua.on = cumsum(quarantine.complying.on),
+         cum.cases.caught = cumsum(cases.caught),
   )
 outb <- outb %>%
-  mutate(prop.found = cases.caught/(active.inf.off+active.inf.on)) %>% 
-  mutate(prop.found = ifelse (is.na(prop.found), 0, prop.found))
+  mutate(prop.found = cum.cases.caught/(cum.cases.off+cum.cases.on),
+         prop.found. = cum.infections.removed/
+           (cum.cases.off+cum.cases.on)) %>% 
+  mutate(prop.found = ifelse (is.na(prop.found), 0, prop.found),
+         prop.found. = ifelse (is.na(prop.found.), 0, prop.found.))
+table(1<outb$prop.found. &
+        !is.na(outb$prop.found.))
 
-
-outb$compliance <- factor(paste("Compliance =", outb$compliance), levels = paste("Compliance =",c("50%","100%")), ordered = T)
-outb$sens.lamp <- factor(paste0(outb$sens.lamp), levels = c(.6,.7,.8,.9), labels = c("60%","70%","80%","90%"), ordered = T)
+outb$compliance <- factor(paste0(outb$compliance), levels = c("50%","100%"), ordered = T)
+outb$sens.lamp <- factor(paste0(outb$sens.lamp), levels = c(.6,.75,.9), labels = c("60%","75%","90%"), ordered = T)
 
 # outb %>%
 #   filter(day == max(day),
@@ -239,6 +295,60 @@ outb$sens.lamp <- factor(paste0(outb$sens.lamp), levels = c(.6,.7,.8,.9), labels
 #   labs(x = "Population Tested",
 #        y = "Epidemic Size")
 
+outb %>%
+  filter(day == max(day)) %>%
+  group_by(tests,sens.lamp, compliance) %>%
+  summarize(mean = mean((cum.cases.on+cum.cases.off)/20000)) %>% 
+  pivot_wider(id_cols = c(tests, compliance), 
+              names_from = sens.lamp, 
+              values_from = mean) %>% 
+  mutate(range = `60%`-`90%`) %>% 
+  # arrange(-range) %>% 
+  filter(compliance == "100%")
+
+outb %>%
+  filter(day == max(day)) %>%
+  group_by(tests,sens.lamp,compliance) %>%
+  summarize(mean = mean(cum.cases.caught/cum.active),
+            upper = quantile(cum.cases.caught/cum.active, .975),
+            lower = quantile(cum.cases.caught/cum.active, 0.025)) %>% 
+  filter(sens.lamp %in% c("75%")) %>% 
+  filter(compliance == "100%")
+
+outb %>%
+  filter(day == max(day)) %>%
+  group_by(tests,sens.lamp,compliance) %>%
+  summarize(mean = mean(cum.cases.caught/cum.active)) %>% 
+  pivot_wider(id_cols = c(tests, compliance), 
+              names_from = sens.lamp, 
+              values_from = mean) %>% 
+  mutate(range = `90%`-`60%`) %>% 
+  arrange(-range)
+
+outb %>%
+  filter(day == max(day)) %>%
+  group_by(tests,sens.lamp,compliance) %>%
+  summarize(mean = mean((cum.cases.on+cum.cases.off)/20000)) %>% 
+  pivot_wider(id_cols = c(tests, sens.lamp), 
+              names_from = compliance, 
+              values_from = mean) %>% 
+  mutate(range = `50%`-`100%`) %>% 
+  arrange(-range)
+
+outb %>%
+  filter(day == max(day)) %>%
+  group_by(tests,sens.lamp,compliance) %>%
+  summarize(mean = mean(cum.cases.caught/cum.active)) %>% 
+  pivot_wider(id_cols = c(tests, sens.lamp), 
+              names_from = compliance, 
+              values_from = mean) %>% 
+  mutate(range = `100%`-`50%`) %>% 
+  arrange(-range)
+```
+
+```{r}
+size = 0.35
+fnt = 7
 a <- outb %>%
   filter(day == max(day),
          tests != 0) %>%
@@ -246,44 +356,138 @@ a <- outb %>%
   summarize(mean = mean(cum.cases.on + cum.cases.off)/20000,
             upper = quantile(cum.cases.on + cum.cases.off, .975)/20000,
             lower = quantile(cum.cases.on + cum.cases.off, 0.025)/20000) %>%
-  ggplot(aes(x = tests/20000, y = mean, color = sens.lamp, fill = sens.lamp, z = sens.lamp, group = sens.lamp)) +
-  geom_line() +
-  geom_ribbon(aes(ymax = upper, ymin = lower), color = NA, alpha = 0.5) +
+  ggplot(aes(x = tests/20000, y = mean, color = compliance, fill = compliance, linetype = factor(sens.lamp), alpha = factor(sens.lamp))) +
+  geom_ribbon(aes(ymax = upper, ymin = lower), color = NA) +
+  geom_line(color = "black", alpha = 1) +
   theme_classic() +
-  scale_fill_viridis_d(name = "Sensitivity") +
-  scale_color_viridis_d(name = "Sensitivity") +
+  scale_fill_viridis_d(name = "Compliance", begin = 0, end = 0.5) +
+  scale_color_viridis_d(name = "Compliance", begin = 0, end = 0.5) +
+  scale_linetype_discrete(name = "Sensitivity") +
+  scale_alpha_discrete(name = "Sensitivity", range = c(0.3, 1)) +
   rotate_x_text() +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1L)) +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks = c(0, 0.15, 0.3, 0.45, 0.6, 0.75)) +
   scale_x_continuous(labels = scales::percent_format(accuracy = 1L)) +
-  facet_grid(.~compliance) +
-  labs(x = "Average Population Tested Per Day",
-       y = "Epidemic Size")
+  labs(x = "Screening Frequency",
+       y = "Epidemic Size") +
+  theme(legend.key.size = unit(size, 'cm'), 
+        legend.key.height = unit(size, 'cm'),
+        legend.key.width = unit(size, 'cm'),
+        legend.title = element_text(size=fnt),
+        legend.text = element_text(size=fnt),
+        axis.title = element_text(size=9))
+
+outb$tests.f <- factor(outb$tests, levels = c(0,500,1000,2000,4000), labels = c("0%", "2.5%", "5%", "10%", "20%"), ordered = T)
+
+outb$compliance.f <- factor(outb$compliance, levels = c("50%","100%"), labels = c("Compliance = 50%", "Compliance = 100%"), ordered = T)
+b <- outb %>% 
+  filter(day == max(day)) %>% 
+  filter(!is.na(tests.f)) %>% 
+  group_by(tests.f, sens.lamp,compliance.f) %>%
+  summarize(mean = mean(symp.demand),
+            upper = quantile(symp.demand, .975),
+            lower = quantile(symp.demand, 0.025)) %>%
+  ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f, group = sens.lamp)) +
+  geom_col(aes(alpha = factor(sens.lamp)), position = position_dodge(.75), stat="identity", width=.75) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = sens.lamp), color = "black", position = position_dodge(.75), stat="identity", width=.75) +
+  labs(y="Diagnostic Tests",
+       x = "Screening Frequency") +
+  theme_classic() + 
+  scale_fill_viridis_d(name = "Screening Frequency", guide = F) +
+  scale_color_viridis_d(name = "Screening Frequency", guide = F) +
+  scale_alpha_discrete(name = "Sensitivity") +
+  theme(legend.key.size = unit(size, 'cm'), 
+        legend.key.height = unit(size, 'cm'),
+        legend.key.width = unit(size, 'cm'),
+        legend.title = element_text(size=fnt),
+        legend.text = element_text(size=fnt),
+        axis.title = element_text(size=9)) +
+  scale_linetype_manual(values = c(4,2,1),name = "Sensitivity") +
+  scale_y_continuous(breaks = seq(500,7000, 1500)) +
+  facet_grid(.~compliance.f)
+
+c <- outb %>% 
+  filter(day == max(day)) %>% 
+  filter(!is.na(tests.f)) %>%
+  group_by(tests.f, sens.lamp, compliance.f) %>%
+  summarize(mean = mean(asymp.demand),
+            upper = quantile(asymp.demand, .975),
+            lower = quantile(asymp.demand, 0.025)) %>%
+  ggplot(aes(x = tests.f, y = mean, color = tests.f, fill = tests.f, group = sens.lamp)) +
+  geom_col(aes(alpha = factor(sens.lamp)), position = position_dodge(.75), stat="identity", width=.75) +
+  geom_linerange(aes(ymax=upper, ymin=lower, group = sens.lamp), color = "black", position = position_dodge(.75), stat="identity", width=.75) +
+  labs(y="Diagnostic\nFollow-up Tests",
+       x = "Screening Frequency") +
+  theme_classic() + 
+  scale_fill_viridis_d(name = "Screening Frequency", guide = F) +
+  scale_color_viridis_d(name = "Screening Frequency", guide = F) +
+  scale_alpha_discrete(name = "Sensitivity") +
+  theme(legend.key.size = unit(size, 'cm'), 
+        legend.key.height = unit(size, 'cm'),
+        legend.key.width = unit(size, 'cm'),
+        legend.title = element_text(size=fnt),
+        legend.text = element_text(size=fnt),
+        axis.title = element_text(size=9)) +
+  scale_linetype_manual(values = c(4,2,1),name = "Sensitivity") +
+  scale_y_continuous(breaks = seq(500,3000, 500))  +
+  facet_grid(.~compliance.f)
+
+d <- outb %>%
+  filter(day == max(day)) %>% 
+  group_by(tests,sens.lamp,compliance) %>%
+  summarize(mean = mean(prop.found),
+            upper = quantile(prop.found, .975),
+            lower = quantile(prop.found, 0.025)) %>%
+  ggplot(aes(x = tests/20000, y = mean, color = compliance, fill = compliance, linetype = factor(sens.lamp), alpha = factor(sens.lamp))) +
+  geom_ribbon(aes(ymax = upper, ymin = lower), color = NA) +
+  geom_line(color = "black", alpha = 1) +
+  theme_classic() +
+  scale_fill_viridis_d(name = "Compliance", begin = 0, end = 0.5) +
+  scale_color_viridis_d(name = "Compliance", begin = 0, end = 0.5) +
+  scale_linetype_discrete(name = "Sensitivity") +
+  scale_alpha_discrete(name = "Sensitivity", range = c(0.3, 1)) +
+  rotate_x_text() +
+  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), breaks = c(0.5, 0.6, 0.7, 0.8, 0.9)) +
+  scale_x_continuous(labels = scales::percent_format(accuracy = 1L)) +
+  labs(x = "Screening Frequency",
+       y = "Infectious\nCases Detected") +
+  theme(legend.key.size = unit(size, 'cm'), 
+        legend.key.height = unit(size, 'cm'),
+        legend.key.width = unit(size, 'cm'),
+        legend.title = element_text(size=fnt),
+        legend.text = element_text(size=fnt),
+        axis.title = element_text(size=9))
+
+
+ggarrange(a,d,b,c, legend = "none", labels = c("A","B","C","D"), align = "hv", nrow = 2, ncol = 2)
+```
+
+
+```{r}
 # outb. <- outb %>% 
 #   filter(sens.lamp %in% c(.5, .6,.7,.8,.9,.1))
 # outb.$sens.lamp <- factor(paste0(outb.$sens.lamp,"%"), levels = paste0(c(.5,.6,.7,.8,.9,.1),"%"), ordered = T)
-unique(outb$tests)               
-b <- outb %>%
-  filter(day == max(day), 
-           tests %in% c(0,1000, 2000, 3000,4000,5000)) %>%
-  group_by(tests,sens.lamp,compliance) %>%
-  summarize(mean = mean(cum.cases.caught/cum.active),
-            upper = quantile(cum.cases.caught/cum.active, .975),
-            lower = quantile(cum.cases.caught/cum.active, 0.025)) %>%
-  ggplot(aes(x = tests/20000, y = mean, color = sens.lamp, fill = sens.lamp, z = sens.lamp, group = factor(sens.lamp))) +
-  geom_bar(stat = "identity", position = "dodge") +
-  geom_errorbar(aes(ymax = upper, ymin = lower), position = "dodge", color = "black") +
-  theme_classic() +
-  scale_fill_viridis_d(name = "Sensitivity") +
-  scale_color_viridis_d(name = "Sensitivity") +
-  rotate_x_text() +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1L)) +
-  scale_x_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 6) +
-  facet_grid(.~compliance) +
-  labs(x = "Average Population Tested Per Day",
-       y = "Active Cases\nDetected")
-ggarrange(a,b, nrow = 2, labels = c("A","B"), common.legend = T, legend = "bottom", align = "v")
-beepr::beep(3)
-beepr::beep(1)
+# unique(outb$tests)               
+# b <- outb %>%
+#   filter(day == max(day),
+#            tests %in% c(0,1000, 2000, 3000,4000)) %>%
+#   group_by(tests,sens.lamp,compliance) %>%
+#   summarize(mean = mean(prop.found),
+#             upper = quantile(prop.found, .975),
+#             lower = quantile(prop.found, 0.025)) %>%
+#   ggplot(aes(x = tests/20000, y = mean, color = sens.lamp, fill = sens.lamp, z = sens.lamp, group = factor(sens.lamp))) +
+#   geom_bar(stat = "identity", position = "dodge") +
+#   geom_errorbar(aes(ymax = upper, ymin = lower), position = "dodge", color = "black") +
+#   theme_classic() +
+#   scale_fill_viridis_d(name = "Compliance") +
+#   scale_color_viridis_d(name = "Compliance") +
+#   rotate_x_text() +
+#   scale_y_continuous(labels = scales::percent_format(accuracy = 1L)) +
+#   scale_x_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 6) +
+#   facet_grid(.~compliance) +
+#   labs(x = "Average Population Tested Per Day",
+#        y = "Infectious Cases\nDetected")
+# ggarrange(a,b, nrow = 2, labels = c("A","B"), common.legend = T, legend = "bottom", align = "v")
+# beepr::beep(1)
 ```
 
 
@@ -497,248 +701,248 @@ beepr::beep(1)
 ```
 
 ```{r}
-p1 <- seq(0,5000, by = 500)
-p2 <- seq(0,5000, by = 500) / 2
-p4 <- seq(0,5000, by = 500) / 4
-
-set.seed(12345)
-
-outputa <- uni_sims_par(tst = p1, test.timeline = c("Sustained"),compliance = c(.5,1), 
-                       init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
-                       R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
-                       sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.98), 
-                       spec.lamp = .98, lamp.diagnostic = F, 
-                       community.intro.daily.on = 1, community.prob.daily.on =0.1,
-                       community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                       immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
-                       contact.tracing.limit = 0, pooling = 1, pooling.multi = .05,
-                       days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
-                       ncores=4) # for comuptational efficiency, make null if you want
-outputb <- uni_sims_par(tst = p1, test.timeline = c("Sustained"),compliance = c(.5,1), 
-                       init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
-                       R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
-                       sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
-                       spec.lamp = .98, lamp.diagnostic = F, 
-                       community.intro.daily.on = 1, community.prob.daily.on =0.1,
-                       community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                       immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
-                       contact.tracing.limit = 0, pooling = 1, pooling.multi = .05,
-                       days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
-                       ncores=4) # for comuptational efficiency, make null if you want
-outputc <- uni_sims_par(tst = p2, test.timeline = c("Sustained"),compliance = c(.5,1), 
-                       init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
-                       R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
-                       sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
-                       spec.lamp = .98, lamp.diagnostic = F, 
-                       community.intro.daily.on = 1, community.prob.daily.on =0.1,
-                       community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                       immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
-                       contact.tracing.limit = 0, pooling = 2, pooling.multi = .05,
-                       days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
-                       ncores=4) # for comuptational efficiency, make null if you want
-outputd <- uni_sims_par(tst = p4, test.timeline = c("Sustained"),compliance = c(.5,1), 
-                       init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
-                       R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
-                       sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
-                       spec.lamp = .98, lamp.diagnostic = F, 
-                       community.intro.daily.on = 1, community.prob.daily.on =0.1,
-                       community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                       immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
-                       contact.tracing.limit = 0, pooling = 4, pooling.multi = .05,
-                       days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
-                       ncores=4) # for comuptational efficiency, make null if you want
-outpute <- uni_sims_par(tst = 0, test.timeline = c("Sustained"), compliance = c(.5,1), 
-                       init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
-                       R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
-                       sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
-                       spec.lamp = .98, lamp.diagnostic = F, 
-                       community.intro.daily.on = 1, community.prob.daily.on =0.1,
-                       community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                       immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
-                       contact.tracing.limit = 0, pooling = 4, pooling.multi = .05,
-                       days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
-                       ncores=4) # for comuptational efficiency, make null if you want
-beepr::beep(1)
-
-out1 <- outputa %>%
-  group_by(group) %>%
-  mutate(cum.cases.on = cumsum(new.cases.on),
-         cum.active = cumsum(active.inf.off+active.inf.on),
-         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
-         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
-         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
-         cum.cases.off = cumsum(new.cases.off),
-         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
-         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
-         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
-         cum.cases.caught = cumsum(cases.caught),
-         symp.demand = cumsum(symp.pcr),
-         asymp.demand = cumsum(asymp.pcr),
-         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
-         cum.iso.on = cumsum(isolation.complying.on),
-         cum.iso.off = cumsum(isolation.complying.off),
-         cum.qua.off = cumsum(quarantine.complying.off),
-         cum.qua.on = cumsum(quarantine.complying.on),
-         scenario = "PCR Surveillance",
-         surveillance.c = tests*12.50*150,
-         cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c, 
-         tested = tests*pooling
-  )%>% 
-  filter(day == max(day))
-out2 <- outputb %>%
-  group_by(group) %>%
-  mutate(cum.cases.on = cumsum(new.cases.on),
-         cum.active = cumsum(active.inf.off+active.inf.on),
-         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
-         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
-         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
-         cum.cases.off = cumsum(new.cases.off),
-         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
-         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
-         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
-         cum.cases.caught = cumsum(cases.caught),
-         symp.demand = cumsum(symp.pcr),
-         asymp.demand = cumsum(asymp.pcr),
-         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
-         cum.iso.on = cumsum(isolation.complying.on),
-         cum.iso.off = cumsum(isolation.complying.off),
-         cum.qua.off = cumsum(quarantine.complying.off),
-         cum.qua.on = cumsum(quarantine.complying.on),
-         scenario = "LAMP - No Pool",
-         surveillance.c = tests*3.5*150,
-         cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
-         tested = tests*pooling
-  )%>% 
-  filter(day == max(day))
-out3 <- outputc %>%
-  group_by(group) %>%
-  mutate(cum.cases.on = cumsum(new.cases.on),
-         cum.active = cumsum(active.inf.off+active.inf.on),
-         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
-         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
-         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
-         cum.cases.off = cumsum(new.cases.off),
-         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
-         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
-         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
-         cum.cases.caught = cumsum(cases.caught),
-         symp.demand = cumsum(symp.pcr),
-         asymp.demand = cumsum(asymp.pcr),
-         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
-         cum.iso.on = cumsum(isolation.complying.on),
-         cum.iso.off = cumsum(isolation.complying.off),
-         cum.qua.off = cumsum(quarantine.complying.off),
-         cum.qua.on = cumsum(quarantine.complying.on),
-         scenario = "LAMP - Pool 2",
-         surveillance.c = tests*3.5*150,
-         cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
-         tested = tests*pooling
-  )%>% 
-  filter(day == max(day))
-out4 <- outputd %>%
-  group_by(group) %>%
-  mutate(cum.cases.on = cumsum(new.cases.on),
-         cum.active = cumsum(active.inf.off+active.inf.on),
-         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
-         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
-         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
-         cum.cases.off = cumsum(new.cases.off),
-         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
-         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
-         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
-         cum.cases.caught = cumsum(cases.caught),
-         symp.demand = cumsum(symp.pcr),
-         asymp.demand = cumsum(asymp.pcr),
-         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
-         cum.iso.on = cumsum(isolation.complying.on),
-         cum.iso.off = cumsum(isolation.complying.off),
-         cum.qua.off = cumsum(quarantine.complying.off),
-         cum.qua.on = cumsum(quarantine.complying.on),
-         scenario = "LAMP - Pool 4",
-         surveillance.c = tests*3.5*150,
-         cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
-         tested = tests*pooling
-  ) %>% 
-  filter(day == max(day))
-out5 <- outpute %>%
-  group_by(group) %>%
-  mutate(cum.cases.on = cumsum(new.cases.on),
-         cum.active = cumsum(active.inf.off+active.inf.on),
-         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
-         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
-         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
-         cum.cases.off = cumsum(new.cases.off),
-         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
-         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
-         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
-         cum.cases.caught = cumsum(cases.caught),
-         symp.demand = cumsum(symp.pcr),
-         asymp.demand = cumsum(asymp.pcr),
-         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
-         cum.iso.on = cumsum(isolation.complying.on),
-         cum.iso.off = cumsum(isolation.complying.off),
-         cum.qua.off = cumsum(quarantine.complying.off),
-         cum.qua.on = cumsum(quarantine.complying.on),
-         scenario = "Symptomatic Only",
-         surveillance.c = tests*3.5*150,
-         cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
-         tested = tests*pooling
-  ) %>% 
-  filter(day == max(day))
-outc <- rbind(out2,out3,out4)
-outc$cost.pcr <- rep(out1$cost,4)
-outc$cases.pcr <- rep(out1$cum.cases.on+out1$cum.cases.off,4)
-outc$compliance <- factor(paste("Compliance =", outc$compliance), levels = paste("Compliance =",c("50%","100%")), ordered = T)
-a <- outc %>% 
-  group_by(tested,scenario,compliance) %>% 
-  summarize(cost.ratio = mean(cost/cost.pcr),
-            case.ratio = mean((cum.cases.on+cum.cases.off)/cases.pcr)) %>% 
-  ggplot(aes(x = tested/20000, y = cost.ratio, color = scenario,  group = scenario)) +
-  geom_line() +
-  theme_classic() +
-  scale_color_viridis_d(name = "Testing\nScenario") +
-  rotate_x_text() +
-  scale_y_log10(labels = scales::percent_format(accuracy = 1L)) +
-  scale_x_continuous(labels = scales::percent_format(accuracy = 1L)) +
-  facet_grid(.~compliance) +
-  labs(x = "Population Tested",
-       y = "Cost Ratio to PCR")
-
-outc %>% 
-  group_by(tested,scenario,compliance) %>% 
-  summarize(cost.ratio = mean(cost/cost.pcr),
-            case.ratio = mean((cum.cases.on+cum.cases.off)/cases.pcr),
-            tot.cases = mean(cum.cases.on+cum.cases.off)) %>% 
-  ggplot(aes(x = cost.ratio, y = tot.cases, color = scenario, group = scenario)) +
-  geom_line() +
-  theme_classic() +
-  scale_color_viridis_d(name = "Testing\nScenario") +
-  rotate_x_text() +
-  scale_y_log10() +
-  scale_x_continuous() +
-  facet_grid(.~compliance) +
-  labs(x = "Cost Ratio (LAMP/PCR)",
-       y = "Epidemic Size") +
-  xlim(0,2)
-  
-ggarrange(a,b, common.legend = T, nrow = 2, legend = "right")
-
-write.csv(outc %>% 
-  group_by(tested,scenario,compliance) %>% 
-  summarize(sensitivity = mean(sens.lamp),
-            tests.per.day = mean(tested),
-            tests.per.sem = tests.per.day * 150,
-            total.cases = mean(cum.cases.on+cum.cases.off),
-            total.symp.pcr = mean(symp.demand),
-            total.asymp.pcr = mean(symp.demand),
-            cost = mean(cost)), "DF.csv")
+# p1 <- seq(0,5000, by = 500)
+# p2 <- seq(0,5000, by = 500) / 2
+# p4 <- seq(0,5000, by = 500) / 4
+# 
+# set.seed(12345)
+# 
+# outputa <- uni_sims_par(tst = p1, test.timeline = c("Sustained"),compliance = c(.5,1), 
+#                        init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
+#                        R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
+#                        sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.98), 
+#                        spec.lamp = .98, lamp.diagnostic = F, 
+#                        community.intro.daily.on = 1, community.prob.daily.on =0.1,
+#                        community.intro.daily.off = 1, community.prob.daily.off =0.1,
+#                        immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
+#                        contact.tracing.limit = 0, pooling = 1, pooling.multi = .05,
+#                        days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
+#                        ncores=7) # for comuptational efficiency, make null if you want
+# outputb <- uni_sims_par(tst = p1, test.timeline = c("Sustained"),compliance = c(.5,1), 
+#                        init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
+#                        R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
+#                        sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
+#                        spec.lamp = .98, lamp.diagnostic = F, 
+#                        community.intro.daily.on = 1, community.prob.daily.on =0.1,
+#                        community.intro.daily.off = 1, community.prob.daily.off =0.1,
+#                        immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
+#                        contact.tracing.limit = 0, pooling = 1, pooling.multi = .05,
+#                        days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
+#                        ncores=7) # for comuptational efficiency, make null if you want
+# outputc <- uni_sims_par(tst = p2, test.timeline = c("Sustained"),compliance = c(.5,1), 
+#                        init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
+#                        R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
+#                        sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
+#                        spec.lamp = .98, lamp.diagnostic = F, 
+#                        community.intro.daily.on = 1, community.prob.daily.on =0.1,
+#                        community.intro.daily.off = 1, community.prob.daily.off =0.1,
+#                        immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
+#                        contact.tracing.limit = 0, pooling = 2, pooling.multi = .05,
+#                        days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
+#                        ncores=7) # for comuptational efficiency, make null if you want
+# outputd <- uni_sims_par(tst = p4, test.timeline = c("Sustained"),compliance = c(.5,1), 
+#                        init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
+#                        R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
+#                        sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
+#                        spec.lamp = .98, lamp.diagnostic = F, 
+#                        community.intro.daily.on = 1, community.prob.daily.on =0.1,
+#                        community.intro.daily.off = 1, community.prob.daily.off =0.1,
+#                        immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
+#                        contact.tracing.limit = 0, pooling = 4, pooling.multi = .05,
+#                        days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
+#                        ncores=7) # for comuptational efficiency, make null if you want
+# outpute <- uni_sims_par(tst = 0, test.timeline = c("Sustained"), compliance = c(.5,1), 
+#                        init.prev = .01, ppn_sympt = .5, care.seeking = 1, 
+#                        R0.on = 3,  R0.off = 3, test.scenario = "No Delay",
+#                        sens.pcr = .99,  spec.pcr = .99, sens.lamp = c(.771), 
+#                        spec.lamp = .98, lamp.diagnostic = F, 
+#                        community.intro.daily.on = 1, community.prob.daily.on =0.1,
+#                        community.intro.daily.off = 1, community.prob.daily.off =0.1,
+#                        immunity = 0.05, N0 = 20000, on.campus.prop = .25, 
+#                        contact.tracing.limit = 0, pooling = 4, pooling.multi = .05,
+#                        days = 150, sims = 50, days.to.isolate = 10, days.to.quarantine = 10,
+#                        ncores=7) # for comuptational efficiency, make null if you want
+# beepr::beep(1)
+# 
+# out1 <- outputa %>%
+#   group_by(group) %>%
+#   mutate(cum.cases.on = cumsum(new.cases.on),
+#          cum.active = cumsum(active.inf.off+active.inf.on),
+#          cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+#          cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+#          cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+#          cum.cases.off = cumsum(new.cases.off),
+#          cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+#          cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+#          cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+#          cum.cases.caught = cumsum(cases.caught),
+#          symp.demand = cumsum(symp.pcr),
+#          asymp.demand = cumsum(asymp.pcr),
+#          pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
+#          cum.iso.on = cumsum(isolation.complying.on),
+#          cum.iso.off = cumsum(isolation.complying.off),
+#          cum.qua.off = cumsum(quarantine.complying.off),
+#          cum.qua.on = cumsum(quarantine.complying.on),
+#          scenario = "PCR Surveillance",
+#          surveillance.c = tests*12.50*150,
+#          cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c, 
+#          tested = tests*pooling
+#   )%>% 
+#   filter(day == max(day))
+# out2 <- outputb %>%
+#   group_by(group) %>%
+#   mutate(cum.cases.on = cumsum(new.cases.on),
+#          cum.active = cumsum(active.inf.off+active.inf.on),
+#          cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+#          cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+#          cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+#          cum.cases.off = cumsum(new.cases.off),
+#          cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+#          cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+#          cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+#          cum.cases.caught = cumsum(cases.caught),
+#          symp.demand = cumsum(symp.pcr),
+#          asymp.demand = cumsum(asymp.pcr),
+#          pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
+#          cum.iso.on = cumsum(isolation.complying.on),
+#          cum.iso.off = cumsum(isolation.complying.off),
+#          cum.qua.off = cumsum(quarantine.complying.off),
+#          cum.qua.on = cumsum(quarantine.complying.on),
+#          scenario = "LAMP - No Pool",
+#          surveillance.c = tests*3.5*150,
+#          cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
+#          tested = tests*pooling
+#   )%>% 
+#   filter(day == max(day))
+# out3 <- outputc %>%
+#   group_by(group) %>%
+#   mutate(cum.cases.on = cumsum(new.cases.on),
+#          cum.active = cumsum(active.inf.off+active.inf.on),
+#          cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+#          cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+#          cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+#          cum.cases.off = cumsum(new.cases.off),
+#          cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+#          cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+#          cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+#          cum.cases.caught = cumsum(cases.caught),
+#          symp.demand = cumsum(symp.pcr),
+#          asymp.demand = cumsum(asymp.pcr),
+#          pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
+#          cum.iso.on = cumsum(isolation.complying.on),
+#          cum.iso.off = cumsum(isolation.complying.off),
+#          cum.qua.off = cumsum(quarantine.complying.off),
+#          cum.qua.on = cumsum(quarantine.complying.on),
+#          scenario = "LAMP - Pool 2",
+#          surveillance.c = tests*3.5*150,
+#          cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
+#          tested = tests*pooling
+#   )%>% 
+#   filter(day == max(day))
+# out4 <- outputd %>%
+#   group_by(group) %>%
+#   mutate(cum.cases.on = cumsum(new.cases.on),
+#          cum.active = cumsum(active.inf.off+active.inf.on),
+#          cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+#          cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+#          cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+#          cum.cases.off = cumsum(new.cases.off),
+#          cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+#          cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+#          cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+#          cum.cases.caught = cumsum(cases.caught),
+#          symp.demand = cumsum(symp.pcr),
+#          asymp.demand = cumsum(asymp.pcr),
+#          pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
+#          cum.iso.on = cumsum(isolation.complying.on),
+#          cum.iso.off = cumsum(isolation.complying.off),
+#          cum.qua.off = cumsum(quarantine.complying.off),
+#          cum.qua.on = cumsum(quarantine.complying.on),
+#          scenario = "LAMP - Pool 4",
+#          surveillance.c = tests*3.5*150,
+#          cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
+#          tested = tests*pooling
+#   ) %>% 
+#   filter(day == max(day))
+# out5 <- outpute %>%
+#   group_by(group) %>%
+#   mutate(cum.cases.on = cumsum(new.cases.on),
+#          cum.active = cumsum(active.inf.off+active.inf.on),
+#          cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+#          cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+#          cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+#          cum.cases.off = cumsum(new.cases.off),
+#          cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+#          cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+#          cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+#          cum.cases.caught = cumsum(cases.caught),
+#          symp.demand = cumsum(symp.pcr),
+#          asymp.demand = cumsum(asymp.pcr),
+#          pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
+#          cum.iso.on = cumsum(isolation.complying.on),
+#          cum.iso.off = cumsum(isolation.complying.off),
+#          cum.qua.off = cumsum(quarantine.complying.off),
+#          cum.qua.on = cumsum(quarantine.complying.on),
+#          scenario = "Symptomatic Only",
+#          surveillance.c = tests*3.5*150,
+#          cost = symp.demand * 12.50 + asymp.demand * 12.50 + surveillance.c,
+#          tested = tests*pooling
+#   ) %>% 
+#   filter(day == max(day))
+# outc <- rbind(out2,out3,out4)
+# outc$cost.pcr <- rep(out1$cost,3)
+# outc$cases.pcr <- rep(out1$cum.cases.on+out1$cum.cases.off,3)
+# outc$compliance <- factor(paste("Compliance =", outc$compliance), levels = paste("Compliance =",c("50%","100%")), ordered = T)
+# a <- outc %>% 
+#   group_by(tested,scenario,compliance) %>% 
+#   summarize(cost.ratio = mean(cost/cost.pcr),
+#             case.ratio = mean((cum.cases.on+cum.cases.off)/cases.pcr)) %>% 
+#   ggplot(aes(x = tested/20000, y = cost.ratio, color = scenario,  group = scenario)) +
+#   geom_line() +
+#   theme_classic() +
+#   scale_color_viridis_d(name = "Testing\nScenario") +
+#   rotate_x_text() +
+#   scale_y_log10(labels = scales::percent_format(accuracy = 1L)) +
+#   scale_x_continuous(labels = scales::percent_format(accuracy = 1L)) +
+#   facet_grid(.~compliance) +
+#   labs(x = "Population Tested",
+#        y = "Cost Ratio to PCR")
+# 
+# outc %>% 
+#   group_by(tested,scenario,compliance) %>% 
+#   summarize(cost.ratio = mean(cost/cost.pcr),
+#             case.ratio = mean((cum.cases.on+cum.cases.off)/cases.pcr),
+#             tot.cases = mean(cum.cases.on+cum.cases.off)) %>% 
+#   ggplot(aes(x = cost.ratio, y = tot.cases, color = scenario, group = scenario)) +
+#   geom_line() +
+#   theme_classic() +
+#   scale_color_viridis_d(name = "Testing\nScenario") +
+#   rotate_x_text() +
+#   scale_y_log10() +
+#   scale_x_continuous() +
+#   facet_grid(.~compliance) +
+#   labs(x = "Cost Ratio (LAMP/PCR)",
+#        y = "Epidemic Size") +
+#   xlim(0,2)
+#   
+# ggarrange(a,b, common.legend = T, nrow = 2, legend = "right")
+# 
+# write.csv(outc %>% 
+#   group_by(tested,scenario,compliance) %>% 
+#   summarize(sensitivity = mean(sens.lamp),
+#             tests.per.day = mean(tested),
+#             tests.per.sem = tests.per.day * 150,
+#             total.cases = mean(cum.cases.on+cum.cases.off),
+#             total.symp.pcr = mean(symp.demand),
+#             total.asymp.pcr = mean(symp.demand),
+#             cost = mean(cost)), "DF.csv")
 
 ```
 
 
 ```{r}
-set.seed(12345)
-output <- uni_sims_par(tst = c(0,500,1000,2000), 
+set.seed(1234)
+output <- uni_sims_par(tst = c(0,500,1000,2000,4000), 
                        test.timeline = c("Initial", "Sustained", "Both"),
                        compliance = 1, 
                        init.prev = .01, 
@@ -766,7 +970,7 @@ output <- uni_sims_par(tst = c(0,500,1000,2000),
                        sims = 200,
                        days.to.isolate = 10,
                        days.to.quarantine = 10,
-                       ncores=4)
+                       ncores=7)
 
 outd <- output %>%
   group_by(group) %>%
@@ -802,23 +1006,30 @@ dfa <- df %>%
 dfb <- df %>% 
   mutate(tests = 2000,
          test.timeline = "Symptomatic Only")
-df <- rbind(df,dfa,dfb)
+dfc <- df %>% 
+  mutate(tests = 4000,
+         test.timeline = "Symptomatic Only")
+df <- rbind(df,dfa,dfb,dfc)
 df <- rbind(outd, df)
 
 df$test.timeline <- factor(df$test.timeline, levels =  c("Symptomatic Only","Initial", "Sustained", "Both"),
                            labels = c("Symptomatic Only","Initial Effort", "Sustained Effort", "Front-Loaded Effort"), ordered = T)
-df$pooling <- factor(paste("Pooling =", df$pooling), levels = paste("Pooling =", c(1,2,4)), ordered = T)
-df$tests <- factor(paste0("Tested = ",df$tests/200,"%"), 
-                     levels = c("Tested = 0%", "Tested = 2.5%", "Tested = 5%", "Tested = 10%"), ordered = T)
+df$pooling <- factor(df$pooling, levels = c(1,2,4), labels = c("No Pooling", paste("Pooling =", c(2,4))), ordered = T)
+
+df$tests.f <- factor(paste0("Tests = ",df$tests), 
+                     levels = paste("Tests =", unique(df$tests)), ordered = T)
 df$sens.lamp <- factor(paste0(df$sens.lamp), levels = c(.6,.7,.8,.9), labels = c("60%","70%","80%","90%"), ordered = T)
 
-df %>% 
-  filter(day == max(day),
-         tests != "Tested = 0%") %>% 
-  group_by(day,tests,test.timeline,pooling) %>%
+plot.df <- df %>% 
+  filter(day == max(df$day)) %>% 
+  filter(tests.f != "Tests = 0") %>% 
+  group_by(day,tests.f,test.timeline,pooling) %>%
   summarize(mean = mean(cum.cases.on+cum.cases.off)/20000,
             upper = quantile(cum.cases.on+cum.cases.off, 0.975)/20000,
-            lower = quantile(cum.cases.on+cum.cases.off, 0.025)/20000) %>%
+            lower = quantile(cum.cases.on+cum.cases.off, 0.025)/20000) 
+
+plot.df %>% 
+  filter(test.timeline != "Symptomatic Only") %>% 
   ggplot(aes(x = factor(test.timeline), y = mean, color = factor(test.timeline), fill = factor(test.timeline))) +
   # geom_bar(df, 
   #          mapping = aes(x = factor(test.timeline), y = mean, color = factor(test.timeline), fill = factor(test.timeline)),
@@ -826,18 +1037,37 @@ df %>%
   # geom_errorbar(df, 
   #             mapping = aes(x = factor(test.timeline), y = mean, color = factor(test.timeline), fill = factor(test.timeline), ymax=upper, ymin=lower),stat="identity", color = "black") +
   geom_bar(stat="identity") +
-  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black") +
+  geom_errorbar(aes(ymax=upper, ymin=lower), color = "black", width = 0.5) +
   labs(y="Epidemic Size") +
-  facet_grid(tests~pooling) +
+  facet_grid(tests.f~pooling) +
   theme_classic() + 
-  guides(colour = guide_legend(override.aes = list(alpha = 1, size = 2)))+
   scale_fill_viridis_d(name = "Testing Strategy") +
   scale_color_viridis_d(name = "Testing Strategy") +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10)+
+  geom_hline(data = plot.df %>% 
+  filter(test.timeline == "Symptomatic Only"),
+             mapping = aes(yintercept = mean), linetype = 4, alpha = .5) +
+  # geom_text(data = plot.df %>% 
+  # filter(test.timeline == "Symptomatic Only"),
+  #            mapping = aes(y = mean), x = 2.95, label = "Symptomatic-only\nEpidemic Size", 
+  #           size = 2.5, inherit.aes= F, alpha = 0.5) +
    theme(axis.text.x = element_blank(),
         axis.title.x = element_blank(),
         axis.ticks.x = element_blank(),
-        legend.position="bottom")
+        legend.position="bottom") +
+  scale_y_continuous(labels = scales::percent_format(), breaks = seq(.2,1,.2), limits  = c(0,.85))
+beepr::beep()
+```
+
+```{r}
+df %>% 
+  filter(day == max(day)) %>%
+  group_by(tests.f,pooling,test.timeline) %>%
+  summarize(mean = mean((cum.cases.on+cum.cases.off)/20000)) %>% 
+  filter(pooling == "No Pooling" &
+         tests.f == "Tests = 500") %>% 
+  mutate(max = max(mean),
+         dif = max -mean)
+
 ```
 
 ```{r}
@@ -1094,7 +1324,7 @@ source("sir_lamp_cost_function.R")
 source("uni_sim_cost_function.R")
 source("uni_sim_cost_par_function.R")
 set.seed(12345)
-out <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 15),
+out <- uni_sims_cost_par(test_budget = seq(0,2E6, length.out = 11),
                          test_proportion = seq(0,1,by = 0.025),
                          test.timeline = "Sustained",
                          compliance = c(.5,1), 
@@ -1106,9 +1336,11 @@ out <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 15),
                          sens.pcr = .99, spec.pcr = .99, 
                          sens.lamp = c(.6,.75,.9), spec.lamp = .98, 
                          lamp.diagnostic = F, 
-                         community.intro.daily.on = 1, community.prob.daily.on =0.1,
-                         community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                         immunity = 0.1, 
+                         community.intro.daily.on = 1, 
+                         community.prob.daily.on =0.1,
+                         community.intro.daily.off = 1,
+                         community.prob.daily.off =0.1,
+                         immunity = 0.05, 
                          N0 = 20000, 
                          on.campus.prop = .25, 
                          contact.tracing.limit = 0,
@@ -1118,12 +1350,19 @@ out <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 15),
                          days.to.quarantine = 10,
                          cost.LAMP = 3.50, 
                          cost.PCR = 12.50,
-                         ncores=4)
-
+                         ncores=7)
+unique(out$test_budget)
 df. <- out %>%
+  select(test_budget, test_proportion, compliance,sens.lamp,
+         new.cases.on, reporting.symptoms.on,
+         all.symptomatics.on,positive.asympt.on,
+         new.cases.off,reporting.symptoms.off,
+         all.symptomatics.off,positive.asympt.off,
+         symp.pcr,asymp.pcr,isolation.complying.on,
+         quarantine.complying.on,group,day,
+         tests.on,tests.off,tests.diag) %>% 
   group_by(group) %>%
   mutate(cum.cases.on = cumsum(new.cases.on),
-         cum.active = cumsum(active.inf.off+active.inf.on),
          cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
          cum.all.symptomatics.on = cumsum(all.symptomatics.on),
          cum.all.asymptomatics.on = cumsum(positive.asympt.on),
@@ -1131,13 +1370,9 @@ df. <- out %>%
          cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
          cum.all.symptomatics.off = cumsum(all.symptomatics.off),
          cum.all.asymptomatics.off = cumsum(positive.asympt.off),
-         cum.cases.caught = cumsum(cases.caught),
          symp.demand = cumsum(symp.pcr),
          asymp.demand = cumsum(asymp.pcr),
-         pcr.demand.exceeded = sum(symp.pcr+asymp.pcr > 2000),
          cum.iso.on = cumsum(isolation.complying.on),
-         cum.iso.off = cumsum(isolation.complying.off),
-         cum.qua.off = cumsum(quarantine.complying.off),
          cum.qua.on = cumsum(quarantine.complying.on),
          cost = test_budget*150 + asymp.demand * 12.50 + ((cum.iso.on + cum.qua.on) * 25),
          cost.testing = test_budget*150 + asymp.demand * 3.50,
@@ -1161,9 +1396,96 @@ df. <- out %>%
     mean.tested.sym = mean(tests.on + tests.off),
     mean.tested.dia = mean(tests.diag),
   )
+beepr::beep()
+```
 
+```{r}
+source("sir_lamp_cost_function.R")
+source("uni_sim_cost_function.R")
+source("uni_sim_cost_par_function.R")
+set.seed(12345)
+out <- uni_sims_cost_par(test_budget = seq(0,2E6, length.out = 11),
+                         test_proportion = seq(0,1,by = 0.025),
+                         test.timeline = "Sustained",
+                         compliance = c(.5,1), 
+                         init.prev = .05, 
+                         ppn_sympt = .5, 
+                         care.seeking = 1, 
+                         R0.on = 3,  R0.off = 3, 
+                         test.scenario = c("No Delay"),
+                         sens.pcr = .99, spec.pcr = .99, 
+                         sens.lamp = c(.6,.75,.9), spec.lamp = .98, 
+                         lamp.diagnostic = F, 
+                         community.intro.daily.on = 1, 
+                         community.prob.daily.on =0.1,
+                         community.intro.daily.off = 1,
+                         community.prob.daily.off =0.1,
+                         immunity = 0.05, 
+                         N0 = 20000, 
+                         on.campus.prop = .25, 
+                         contact.tracing.limit = 0,
+                         pooling = 1, pooling.multi = .05,
+                         days = 150, sims = 25,
+                         days.to.isolate = 10,
+                         days.to.quarantine = 10,
+                         cost.LAMP = 3.50, 
+                         cost.PCR = 12.50,
+                         ncores=7)
+unique(out$test_budget)
+df. <- out %>%
+  select(test_budget, test_proportion, compliance,sens.lamp,
+         new.cases.on, reporting.symptoms.on,
+         all.symptomatics.on,positive.asympt.on,
+         new.cases.off,reporting.symptoms.off,
+         all.symptomatics.off,positive.asympt.off,
+         symp.pcr,asymp.pcr,isolation.complying.on,
+         quarantine.complying.on,group,day,
+         tests.on,tests.off,tests.diag) %>% 
+  group_by(group) %>%
+  mutate(cum.cases.on = cumsum(new.cases.on),
+         cum.reporting.symptoms.on = cumsum(reporting.symptoms.on),
+         cum.all.symptomatics.on = cumsum(all.symptomatics.on),
+         cum.all.asymptomatics.on = cumsum(positive.asympt.on),
+         cum.cases.off = cumsum(new.cases.off),
+         cum.reporting.symptoms.off = cumsum(reporting.symptoms.off),
+         cum.all.symptomatics.off = cumsum(all.symptomatics.off),
+         cum.all.asymptomatics.off = cumsum(positive.asympt.off),
+         symp.demand = cumsum(symp.pcr),
+         asymp.demand = cumsum(asymp.pcr),
+         cum.iso.on = cumsum(isolation.complying.on),
+         cum.qua.on = cumsum(quarantine.complying.on),
+         cost = test_budget*150 + asymp.demand * 12.50 + ((cum.iso.on + cum.qua.on) * 25),
+         cost.testing = test_budget*150 + asymp.demand * 3.50,
+         cost.housing = ((cum.iso.on + cum.qua.on) * 25)
+           
+  ) %>% 
+  filter(day == max(day))%>% 
+  group_by(test_proportion,test_budget,
+           sens.lamp,compliance
+           ) %>% 
+  summarize(
+    mean.cases = mean(cum.cases.on + cum.cases.off),
+    low.cases = quantile(cum.cases.on + cum.cases.off, 0.025),
+    high.cases = quantile(cum.cases.on + cum.cases.off, 0.975),
+    mean.cost = mean(cost),
+    mean.cost.t = mean(cost.testing)/mean.cost,
+    mean.cost.h = mean(cost.housing)/mean.cost,
+    low.cost = quantile(cost, 0.025),
+    high.cost = quantile(cost, 0.975),
+    ratio = mean.cases/mean.cost,
+    mean.tested.sym = mean(tests.on + tests.off),
+    mean.tested.dia = mean(tests.diag),
+  )
+beepr::beep()
+```
+
+
+
+```{r}
 df.$sens.lamp <- factor(df.$sens.lamp, levels = unique(df.$sens.lamp), labels = paste0("Sensitivity = ", unique(df.$sens.lamp) * 100, "%"))
 df.$compliance <- factor(df.$compliance, levels = rev(unique(df.$compliance)), labels = rev(paste0("Compliance = ", unique(df.$compliance))))
+
+df.$test_proportion <- ifelse(df.$test_budget == 0, 0, df.$test_proportion)
 
 best.case <- df. %>% 
   group_by(sens.lamp, compliance, test_budget) %>% 
@@ -1172,8 +1494,60 @@ best.cost <- df. %>%
   group_by(sens.lamp, compliance, test_budget) %>% 
   filter(mean.cost == min(mean.cost))
 
+unique(df.$test_budget)
+df. %>% 
+  filter(sens.lamp == 0.75) %>% 
+  mutate(test.investment = test_budget*150,
+         epidemic.size = mean.cases/20000) %>% 
+  filter(test.investment == 2E6 &
+           compliance == "100%") %>% 
+  select(test_proportion,test.investment,epidemic.size) %>% 
+  arrange(epidemic.size)
+
+best.case %>% 
+  mutate(test.investment = test_budget*150,
+         epidemic.size = mean.cases/20000) %>% 
+  pivot_wider(id_cols = c("test.investment","compliance"),
+              names_from = "sens.lamp",
+              values_from="test_proportion") %>% 
+  arrange(test.investment)
+
+best.case %>% 
+  mutate(test.investment = test_budget*150,
+         epidemic.size = mean.cases/20000) %>% 
+  group_by(compliance, test.investment, sens.lamp) %>% 
+  pivot_wider(id_cols = c("test.investment", "sens.lamp"),
+              names_from = "compliance",
+              values_from="test_proportion") %>% 
+  mutate(diff = `Compliance = 100%` - `Compliance = 50%`) %>% 
+  ungroup() %>% 
+  summarize(mean = mean(diff),
+            sd = sd(diff))
+
+best.case %>% 
+  filter(test_budget > 0) %>% 
+  mutate(test.investment = test_budget*150,
+         epidemic.size = mean.cases/20000) %>% 
+  group_by(compliance, test.investment, sens.lamp) %>% 
+  pivot_wider(id_cols = c("test.investment", "compliance"),
+              names_from = "sens.lamp",
+              values_from="test_proportion") %>% 
+  mutate(diff = `Sensitivity = 90%` - `Sensitivity = 60%`) %>% 
+  ungroup() %>% 
+  summarize(mean = mean(diff),
+            sd = sd(diff))
+```
+
+```{r}
+zero.case <- df. %>% 
+  filter(test_budget == 0) %>% 
+  group_by(sens.lamp, compliance) %>% 
+  summarize(mean = mean(mean.cases/20000))
+
 ggplot(df. %>% 
-         filter(test_proportion %in% seq(0,1,length.out = 11)), aes(x = mean.cost/20000, y = mean.cases/20000, color = test_proportion, 
+         filter(test_proportion %in% seq(0,1,length.out = 11)) %>% 
+         filter(test_budget != 0),
+       aes(x = mean.cost/20000, y = mean.cases/20000, color = test_proportion, 
                fill = test_proportion, group = test_proportion)) +
   # geom_smooth(se = F) +
   geom_point() +
@@ -1190,10 +1564,24 @@ ggplot(df. %>%
   labs(x = "Total Testing Cost\nPer Student (USD)", 
        y = "Total Cases") +
   facet_grid(sens.lamp~compliance) +
+  geom_hline(data = zero.case,
+             mapping = aes(yintercept = mean), linetype = 4, alpha = .5) +
+  geom_text(data = zero.case,
+             mapping = aes(y = mean+.1), x = 100, label = "Symptomatic-only", 
+            size = 3, inherit.aes= F, alpha = 0.5) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
   rotate_x_text() 
 
-ggplot(best.case, mapping = aes(x = mean.cost/20000, y = mean.cases/20000, color = test_proportion, fill = test_proportion, group = factor(sens.lamp))) +
+```
+
+```{r}
+zero.case <- df. %>% 
+  filter(test_budget == 0) %>% 
+  group_by(compliance) %>% 
+  summarize(mean = mean(mean.cases/20000))
+
+a <- ggplot(best.case %>% 
+         filter(test_budget != 0), mapping = aes(x = mean.cost/20000, y = mean.cases/20000, color = test_proportion, fill = test_proportion, group = factor(sens.lamp))) +
   geom_line() +
   geom_linerange(aes(ymax = high.cases/20000,
            ymin = low.cases/20000), color = "black") +
@@ -1215,12 +1603,19 @@ ggplot(best.case, mapping = aes(x = mean.cost/20000, y = mean.cases/20000, color
   scale_shape_manual(name = "Sensitivity",
                        labels = c("60%", "75%", "90%"),
                        values = c(21,22,24)) +
-  labs(x = "Total Testing Cost\nPer Student (USD)", 
+  labs(x = "Total Testing Cost Per Student (USD)", 
        y = "Total Cases") +
   facet_grid(.~compliance) +
+  geom_hline(data = zero.case,
+             mapping = aes(yintercept = mean), linetype = 4, alpha = .5) +
+  geom_text(data = zero.case,
+             mapping = aes(y = mean+.025), x = 100, label = "Symptomatic-only", 
+            size = 3, inherit.aes= F, alpha = 0.5) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
   rotate_x_text() 
+```
 
+```{r}
 ggplot(best.case, mapping = aes(x = mean.cost/20000, y = test_proportion, color = mean.cases/20000, fill = mean.cases/20000, group = factor(sens.lamp))) +
   geom_line() +
   geom_point(aes(shape = factor(sens.lamp)), color = "black", size = 2.5) +
@@ -1238,7 +1633,7 @@ ggplot(best.case, mapping = aes(x = mean.cost/20000, y = test_proportion, color 
   scale_shape_manual(name = "Sensitivity",
                        labels = c("60%", "75%", "90%"),
                        values = c(21,22,24)) +
-  labs(x = "Total Testing Cost\nPer Student (USD)", 
+  labs(x = "Total Testing Cost Per Student (USD)", 
        y = "Percent Budget to Screening") +
   facet_grid(.~compliance) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
@@ -1261,7 +1656,9 @@ ggplot(best.case, mapping = aes(x = mean.cost/20000, y = test_proportion, color 
 #   scale_y_log10()
 beepr::beep(1)
 ```
-```{r}
+
+
+```{r, fig.height=2}
 set.seed(12345)
 out.. <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 5),
                          test_proportion = seq(0,1,by = .2),
@@ -1277,7 +1674,7 @@ out.. <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 5),
                          lamp.diagnostic = F, 
                          community.intro.daily.on = 1, community.prob.daily.on =0.1,
                          community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                         immunity = 0.1, 
+                         immunity = 0.05, 
                          N0 = 20000, 
                          on.campus.prop = .25, 
                          contact.tracing.limit = 0,
@@ -1287,7 +1684,7 @@ out.. <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 5),
                          days.to.quarantine = 10,
                          cost.LAMP = c(3.5,12.5,25), 
                          cost.PCR = 12.5,
-                         ncores=4)
+                         ncores=7)
 
 df.. <- out.. %>%
   group_by(group) %>%
@@ -1376,10 +1773,10 @@ source("sir_lamp_cost_function.R")
 source("uni_sim_cost_function.R")
 source("uni_sim_cost_par_function.R")
 set.seed(12345)
-out <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 15),
-                         test_proportion = seq(0,1,by = 0.05),
+out.abc <- uni_sims_cost_par(test_budget = seq(0,2E6, length.out = 11),
+                         test_proportion = seq(0,1,by = 0.025),
                          test.timeline = "Sustained",
-                         compliance = c(1), 
+                         compliance = c(0.5,1), 
                          init.prev = .05, 
                          ppn_sympt = .5, 
                          care.seeking = 1, 
@@ -1388,21 +1785,22 @@ out <- uni_sims_cost_par(test_budget = seq(2.5E5,2E6, length.out = 15),
                          sens.pcr = .99, spec.pcr = .99, 
                          sens.lamp = c(.771), spec.lamp = .98, 
                          lamp.diagnostic = F, 
-                         community.intro.daily.on = 1, community.prob.daily.on =0.1,
+                         community.intro.daily.on = 1, 
+                         community.prob.daily.on =0.1,
                          community.intro.daily.off = 1, community.prob.daily.off =0.1,
-                         immunity = 0.1, 
+                         immunity = 0.05, 
                          N0 = 20000, 
                          on.campus.prop = .25, 
                          contact.tracing.limit = 0,
                          pooling = c(1,2,4), pooling.multi = .05,
-                         days = 150, sims = 50,
+                         days = 150, sims = 25,
                          days.to.isolate = 10,
                          days.to.quarantine = 10,
                          cost.LAMP = 3.50, 
                          cost.PCR = 12.50,
-                         ncores=4)
+                         ncores=7)
 
-df. <- out %>%
+df.. <- out.abc %>%
   group_by(group) %>%
   mutate(cum.cases.on = cumsum(new.cases.on),
          cum.active = cumsum(active.inf.off+active.inf.on),
@@ -1444,38 +1842,41 @@ df. <- out %>%
     mean.tested.dia = mean(tests.diag),
   )
 
-df.$sens.lamp <- factor(df.$sens.lamp, levels = unique(df.$sens.lamp), labels = paste0("Sensitivity = ", unique(df.$sens.lamp) * 100, "%"))
-df.$compliance <- factor(df.$compliance, levels = rev(unique(df.$compliance)), labels = rev(paste0("Compliance = ", unique(df.$compliance))))
+df..$sens.lamp <- factor(df..$sens.lamp, levels = unique(df..$sens.lamp), labels = paste0("Sensitivity = ", unique(df..$sens.lamp) * 100, "%"))
+df..$compliance <- factor(df..$compliance, levels = rev(unique(df..$compliance)), labels = rev(paste0("Compliance = ", unique(df..$compliance))))
 
-best.case <- df. %>% 
+best.case. <- df.. %>% 
   group_by(sens.lamp, compliance, test_budget, pooling) %>% 
   filter(mean.cases == min(mean.cases))
-best.cost <- df. %>% 
+best.cost. <- df.. %>% 
   group_by(sens.lamp, compliance, test_budget, pooling) %>% 
   filter(mean.cost == min(mean.cost))
 
-ggplot(df. %>%
-         filter(test_proportion %in% seq(0,1,length.out = 11)), aes(x = mean.cost/20000, y = mean.cases/20000, color = test_proportion,
-               fill = test_proportion, group = test_proportion)) +
-  # geom_smooth(se = F) +
-  geom_point() +
-  geom_line() +
-  # geom_line(aes(y = mean.cost.t, color = test_proportion), alpha = .2, size = 1) +
-  # geom_point(size = 0.75) +
-  geom_linerange(aes(ymax = high.cases/20000,
-           ymin = low.cases/20000)) +
-  theme_classic() +
-  scale_color_viridis_c(name = "Percent\nBudget to\nScreening",
-                         labels = scales::percent_format(accuracy = 1L)) +
-  scale_fill_viridis_c(name = "Percent\nBudget to\nScreening",
-                         labels = scales::percent_format(accuracy = 1L)) +
-  labs(x = "Total Testing Cost\nPer Student (USD)",
-       y = "Total Cases") +
-  facet_grid(.~pooling) +
-  scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
-  rotate_x_text()
+# ggplot(df.. %>%
+#          filter(test_proportion %in% seq(0,1,length.out = 11)), aes(x = mean.cost/20000, y = mean.cases/20000, color = test_proportion,
+#                fill = test_proportion, group = test_proportion)) +
+#   # geom_smooth(se = F) +
+#   geom_point() +
+#   geom_line() +
+#   # geom_line(aes(y = mean.cost.t, color = test_proportion), alpha = .2, size = 1) +
+#   # geom_point(size = 0.75) +
+#   geom_linerange(aes(ymax = high.cases/20000,
+#            ymin = low.cases/20000)) +
+#   theme_classic() +
+#   scale_color_viridis_c(name = "Percent\nBudget to\nScreening",
+#                          labels = scales::percent_format(accuracy = 1L)) +
+#   scale_fill_viridis_c(name = "Percent\nBudget to\nScreening",
+#                          labels = scales::percent_format(accuracy = 1L)) +
+#   labs(x = "Total Testing Cost\nPer Student (USD)",
+#        y = "Total Cases") +
+#   facet_grid(.~pooling) +
+#   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
+#   rotate_x_text()
 
-ggplot(best.case, mapping = aes(x = mean.cost/20000, y = mean.cases/20000, color = test_proportion, fill = test_proportion, group = factor(pooling))) +
+b <- ggplot(best.case., 
+       mapping = aes(x = mean.cost/20000, y = mean.cases/20000, 
+                     color = test_proportion, fill = test_proportion, 
+                     group = factor(pooling))) +
   geom_line() +
   geom_linerange(aes(ymax = high.cases/20000,
            ymin = low.cases/20000), color = "black") +
@@ -1497,11 +1898,30 @@ ggplot(best.case, mapping = aes(x = mean.cost/20000, y = mean.cases/20000, color
   scale_shape_manual(name = "Pooling",
                        labels = c("1", "2", "4"),
                        values = c(21,22,24)) +
-  labs(x = "Total Testing Cost\nPer Student (USD)",
+  labs(x = "Total Testing Cost Per Student (USD)",
        y = "Epidemic Size") +
-  # facet_grid(.~compliance) +
   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
-  rotate_x_text()
+  rotate_x_text() + 
+  facet_grid(.~compliance) +
+  geom_hline(data = zero.case,
+             mapping = aes(yintercept = mean), linetype = 4, alpha = .5) +
+  geom_text(data = zero.case,
+             mapping = aes(y = mean+.025), x = 100, label = "Symptomatic-only", 
+            size = 3, inherit.aes= F, alpha = 0.5) 
+
+best.case. %>% 
+  filter(test_budget > 0) %>% 
+  mutate(test.investment = test_budget*150,
+         epidemic.size = mean.cases/20000) %>% 
+  group_by(compliance, test.investment, pooling) %>% 
+  pivot_wider(id_cols = c("test.investment", "compliance"),
+              names_from = "pooling",
+              values_from="test_proportion") %>% 
+  mutate(diff = `4` - `1`) %>% 
+  ungroup() %>% 
+  summarize(mean = mean(diff),
+            sd = sd(diff))
+
 # 
 # ggplot(best.case, mapping = aes(x = mean.cost/20000, y = test_proportion, color = mean.cases/20000, fill = mean.cases/20000, group = factor(sens.lamp))) +
 #   geom_line() +
@@ -1544,6 +1964,40 @@ ggplot(best.case, mapping = aes(x = mean.cost/20000, y = mean.cases/20000, color
 #   scale_x_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
 #   scale_y_log10()
 beepr::beep(1)
+
+# ggplot(best.case, mapping = aes(x = mean.cost/20000, y = test_proportion, color = mean.cases/20000, fill = mean.cases/20000, group = factor(sens.lamp))) +
+#   geom_line() +
+#   geom_point(aes(shape = factor(sens.lamp)), color = "black", size = 2.5) +
+#   theme_classic() +
+#   scale_colour_viridis_c(name = "Total Cases",
+#                          labels = scales::percent_format(accuracy = 1L), 
+#                          limits = c(0,1),
+#                          option = "D",
+#                       end = 1, direction = 1) +
+#   scale_fill_viridis_c(name = "Total Cases",
+#                       labels = scales::percent_format(accuracy = 1L),
+#                        limits = c(0,1),
+#                       option = "D",
+#                       end = 1, direction = 1) +
+#   scale_shape_manual(name = "Pooling",
+#                        labels = c("60%", "75%", "90%"),
+#                        values = c(21,22,24)) +
+#   labs(x = "Total Testing Cost\nPer Student (USD)", 
+#        y = "Percent Budget to Screening") +
+#   facet_grid(.~compliance) +
+#   scale_y_continuous(labels = scales::percent_format(accuracy = 1L), n.breaks = 10) +
+#   rotate_x_text() 
 ```
 
+```{r, fig.height=2.3,fig.width=2.3}
+a. <- a +
+  theme(plot.margin = unit(c(.1,.1,1,.1), "lines"))
+b. <- b +
+  theme(plot.margin = unit(c(0,0,0,0), "lines")) +
+  scale_shape_manual(name = "Pooling",
+                       labels = c("No Pooling", "2", "4"),
+                       values = c(21,22,24)) 
+
+ggarrange(a.,b., labels = c("A","B"), align = "hv", nrow = 2)
+```
 

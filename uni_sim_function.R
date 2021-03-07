@@ -99,6 +99,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   symp.pcr <- matrix(0,1,sims)
   asymp.pcr <- matrix(0,1,sims)
   cases.caught <- matrix(0,1,sims)
+  cases.removed <- matrix(0,1,sims)
   N.off <- S.off+E.off+I1.off+I2.off+R.off
   
   atest.wait.3 <- array(0,c(1,sims,10))
@@ -115,22 +116,22 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   # qi_trigger <- numeric(sims)
   
   for(ts in 2:Tsim){
-    if(test.timeline == "Initial" & ts > 20){
+    if(test.timeline == "Initial" & ts > 30){
       tests = 0
     }
-    if(test.timeline == "Initial" & ts <= 20){
-      tests = floor(days*tst/20) 
+    if(test.timeline == "Initial" & ts <= 30){
+      tests = round(days*tst/30) 
     }
     
     if(test.timeline == "Sustained"){
-      tests = floor(tst)
+      tests = round(tst)
     }
     
-    if(test.timeline == "Both" & ts > 20){
-      tests = floor((days*tst/20)/2)
+    if(test.timeline == "Both" & ts <= 30){
+      tests = round((tst*days/2)/30)
     }
-    if(test.timeline == "Both" & ts <= 20){
-      tests = floor((days*tst/2)/(days-20))
+    if(test.timeline == "Both" & ts > 30){
+      tests = round((tst*days/2)/(150-30))
     }
     out <- sir_lamp(sims, 
                     S.on[ts-1,], E.on[ts-1,], I1.on[ts-1,], I2.on[ts-1,], R.on[ts-1,], 
@@ -180,6 +181,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     symp.pcr <- rbind(symp.pcr, out[,132])
     asymp.pcr <- rbind(asymp.pcr, out[,133])
     cases.caught <- rbind(cases.caught, out[,134])
+    cases.removed <- rbind(cases.removed, out[,135])
     
     atest.wait.3 <- abind(atest.wait.3, array(out[,72:81], c(1,sims,10)), along = 1)
     atest.wait.2 <- abind(atest.wait.2, array(out[,82:91], c(1,sims,10)), along = 1)
@@ -195,7 +197,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     isolation.off <- rbind(isolation.off,apply(comply_test_positives.off[(max(1,ts-days.to.isolate)):ts,],2,sum) + apply(symptrep.off[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
     quarantine.off <- rbind(quarantine.off, apply(new_contacts.off[(max(1,ts-days.to.quarantine)):ts,],2,sum) )
   }
-  
+  # browser()
   inf.on <- I1.on+I2.on   # total infectious on campus
   inf.off <- I1.off+I2.off   # total infectious on campus
   case.on <- new_cases.on # daily cases
@@ -219,6 +221,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
               "symp.pcr" = symp.pcr,
               "asymp.pcr" = asymp.pcr,
               "cases.caught" = cases.caught,
+              "cases.removed" = cases.removed,
               "tests"= matrix(tst,Tsim,sims),
               "compliance" = matrix(compliance,Tsim,sims),
               "init.prev"= matrix(init.prev,Tsim,sims),

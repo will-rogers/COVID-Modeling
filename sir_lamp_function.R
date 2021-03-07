@@ -78,8 +78,8 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   
   R.off. <- R.off + dN_I2R.off
   
-  out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_I1I2.on, 
-                S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_I1I2.off ) # assume that I1->I2 is when cases become detectable
+  out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_EI1.on, 
+                S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_EI1.off ) # assume that I1->I2 is when cases become detectable
   sympt.pcr <- newSymptReported.on + newSymptReported.off
   
   avail.tests <- tests * pooling
@@ -187,17 +187,26 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                                     theta, gamma_I1I2, gamma_I2R,
                                     beta_vec.on, beta_vec.off)
   contact.wait.1 <- contacts
-
+  
   if(test.scenario == "2 Days") {
     out[,c(1:5,7:11)] <- pmax(out[,c(1:5,7:11)] - sympt.isolate - (contact.wait.3) - (atest.wait.3),0)
+    cases.removed <- apply(sympt.isolate[,c(3,4,8,9)] + 
+                             contact.wait.3[,c(3,4,8,9)] +
+                             atest.wait.3[,c(3,4,8,9)], 1, sum)
   }
-  
+  # browser()
   if(test.scenario == "1 Day") {
     out[,c(1:5,7:11)] <- pmax(out[,c(1:5,7:11)] - sympt.isolate - (contact.wait.2) - (atest.wait.2),0)
+    cases.removed <- apply(sympt.isolate[,c(3,4,8,9)] + 
+                             contact.wait.2[,c(3,4,8,9)] +
+                             atest.wait.2[,c(3,4,8,9)], 1, sum)
   }
   
   if(test.scenario == "No Delay") {
     out[,c(1:5,7:11)] <- pmax(out[,c(1:5,7:11)] - sympt.isolate - (contact.wait.1) - (atest.wait.1),0)
+    cases.removed <- apply(sympt.isolate[,c(3,4,8,9)] + 
+                             contact.wait.1[,c(3,4,8,9)] +
+                             atest.wait.1[,c(3,4,8,9)], 1, sum)
   }
   
   if(!test.scenario %in% c("2 Days","1 Day","No Delay")) {
@@ -209,7 +218,8 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                contacts, tot.contacts, avail.tests, atests.isolate,
                sympt.isolate, newSymptReportedTrue.on, newSymptReportedTrue.off, 
                atest.wait.3,atest.wait.2,atest.wait.1,
-               contact.wait.3,contact.wait.2,contact.wait.1, sympt.pcr, asymp.pcr, cases.caught
+               contact.wait.3,contact.wait.2,contact.wait.1, 
+               sympt.pcr, asymp.pcr, cases.caught, cases.removed
   )
   # store all states -- SIR states plus tested, reported, contacts
 }

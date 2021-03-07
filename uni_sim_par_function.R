@@ -78,7 +78,9 @@ uni_sims_par <- function(tst = 500,
                                                            days.to.isolate = x[27],
                                                            days.to.quarantine = x[28])))
   } else {
-    cl <- parallel::makeCluster(ncores)
+    cl <- parallel::makeCluster(ncores, 
+                                setup_strategy = "sequential",
+                                setup_timeout = 45)
     parallel::clusterExport(cl,varlist=c('uni_sim','lengthen','sir_lamp', 'sir_simple_step'))
     parallel::clusterEvalQ(cl,{
       library(ggplot2)

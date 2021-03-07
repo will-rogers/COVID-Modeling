@@ -87,7 +87,9 @@ uni_sims_cost_par <- function(test_budget = 1,
                                                            cost.LAMP = x[30], 
                                                            cost.PCR = x[31])))
   } else {
-    cl <- parallel::makeCluster(ncores)
+    cl <- parallel::makeCluster(ncores, 
+                                setup_strategy = "sequential",
+                                setup_timeout = 45)
     parallel::clusterExport(cl,varlist=c('uni_sim_cost','lengthen','sir_lamp_cost', 'sir_simple_step'))
     parallel::clusterEvalQ(cl,{
       library(ggplot2)

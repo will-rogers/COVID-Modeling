@@ -86,8 +86,8 @@ sir_lamp_cost <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt
   
   R.off. <- R.off + dN_I2R.off
   
-  out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_I1I2.on, 
-                S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_I1I2.off ) # assume that I1->I2 is when cases become detectable
+  out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_EI1.on, 
+                S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_EI1.off ) # assume that I1->I2 is when cases become detectable
   
   
   sympt.pcr <- newSymptReported.on + newSymptReported.off
@@ -96,6 +96,7 @@ sir_lamp_cost <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt
   spare.off <- ifelse(tests.off > newSymptReported.off, tests.off - newSymptReported.off, 0)
   
   avail.tests <- (tests.surv + spare.on + spare.off) * pooling
+  # browser()
   if(0 %in% apply(out[,c(1:5,7:11)],1,sum)) browser()
   atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
   tested <- atests

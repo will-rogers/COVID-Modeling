@@ -19,7 +19,7 @@ sens_sims_par <- function(tests=c(1,500,1000), compliance=c(1), introductions = 
                                                               ppn_sympt = x[4], care.seeking = x[5],
                                                               R0 = x[6], sensitivity = x[7], times = x[8], form = x[9])))
   } else {
-    cl <- parallel::makeCluster(ncores)
+    cl <- parallel::makeCluster(ncores, setup_strategy = "sequential")
     parallel::clusterExport(cl,varlist=c('sens_sim', 'modify_sensitivity', 'sir_sens'))
     parallel::clusterEvalQ(cl,{
       library(ggplot2)
