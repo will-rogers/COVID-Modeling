@@ -1,4 +1,6 @@
 # COVID-Modeling
 A simple SEIR for on/off-campus transmission of SARS-CoV-2 with delays in testing, behavioral modifiers, and infection/transmission modifiers. This stems from orginal work by Dr. Matt Ferrari at PSU . 
 
+`uni_sim_par_function.R` and `uni_sim_cost_par_function.R` are functions that bundle the SEIR files and allow for comparison across multiple scenarios with additional ability to run processes in parallel. `uni_sim_function.R` and `uni_sim_cost_function.R` are the wrappers for the SEIR model that store output after each time step. `sir_simple_step_function.R` is a function that allows disease progession in individuals who have been tested but are not yet isolated. `sir_lamp_function.R` and `sir_lamp_cost_function.R` are functions that manage the inputs from the wrapper, `uni_sim_function.R` and `uni_sim_cost_function.R`, and generate disease progression. Functions which contain `cost` are used in cost-limited testing investment scenarios, whereas functions lacking `cost` operate on test-limited scenarios (limited by X number of tests per day. `Results.RMD` and `Supp_Info.Rmd` provide the graphics described in our paper, and show how to run functions.  
+
 Please reach out if you have comments or questions (rogerswill47@gmail.com).
