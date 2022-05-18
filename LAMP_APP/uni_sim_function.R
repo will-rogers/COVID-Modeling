@@ -13,7 +13,8 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
                     immunity = 0.1, N0 = 16750, on.campus.prop = .25, 
                     contact.tracing.limit = 100, pooling = 4, pooling.multi = 1,
                     days = 100, sims = 200,
-                    days.to.isolate = 10, days.to.quarantine = 10){
+                    days.to.isolate = 10, days.to.quarantine = 10,
+                    exposure.days = 5, presymptom.days = 2, postsymptom.days = 7){
   
   Tsim <- as.numeric(days)        # time to simulate over, we only care about start
   sims <- as.numeric(sims)    # number of simulations
@@ -22,6 +23,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   compliance <- as.numeric(compliance)
   care.seeking <- as.numeric(care.seeking) 
   init.prev <- as.numeric(init.prev)
+  days <- as.numeric(days)
   tst <- as.numeric(tst)
   test.scenario <- test.scenario
   sens.pcr <- as.numeric(sens.pcr)
@@ -44,17 +46,21 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   days.to.quarantine <- as.numeric(days.to.quarantine)
   days.to.isolate <- as.numeric(days.to.isolate)
   
+  exposure.days <- as.numeric(exposure.days)
+  presymptom.days <- as.numeric(presymptom.days)
+  postsymptom.days <- as.numeric(postsymptom.days)
+  
   # storage vectors
   RE.on <- R0.on*(1-immunity)  # RE assuming some fraction of population is already immune
   RE.off <- R0.off*(1-immunity) # make argument !!!!!!!!!!!
-  beta.normal.on <- RE.on * (1/9)  # calculate Beta
-  beta.normal.off <- RE.off * (1/9)  # calculate Beta
+  beta.normal.on <- RE.on * (1/(presymptom.days + postsymptom.days))  # calculate Beta
+  beta.normal.off <- RE.off * (1/(presymptom.days + postsymptom.days))  # calculate Beta
   # beta.outbreak <- RE * (1/9) * (1-distancing_reduction)   # calculate Beta
   beta_vec.on <- rep(beta.normal.on,sims)
   beta_vec.off <- rep(beta.normal.off,sims)
-  theta <- 1/5  # 5 days from infection to infectious
-  gamma_I1I2 <- 1/2 # 2 days asymptomatic infectious
-  gamma_I2R <- 1/7 # 7 days infectious (this is probably too short)
+  theta <- 1/exposure.days  # 5 days from infection to infectious
+  gamma_I1I2 <- 1/presymptom.days # 2 days asymptomatic infectious
+  gamma_I2R <- 1/postsymptom.days # 7 days infectious (this is probably too short)
   
   # storage 
   inf.on <- matrix(NA,Tsim,sims)  # storage for infectious class
@@ -98,6 +104,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   symp.pcr <- matrix(0,1,sims)
   asymp.pcr <- matrix(0,1,sims)
   cases.caught <- matrix(0,1,sims)
+  cases.removed <- matrix(0,1,sims)
   N.off <- S.off+E.off+I1.off+I2.off+R.off
   
   atest.wait.3 <- array(0,c(1,sims,10))
@@ -114,22 +121,22 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
   # qi_trigger <- numeric(sims)
   
   for(ts in 2:Tsim){
-    if(test.timeline == "Initial" & ts > 20){
+    if(test.timeline == "Initial" & ts > 30){
       tests = 0
     }
-    if(test.timeline == "Initial" & ts <= 20){
-      tests = floor(5*tst) 
+    if(test.timeline == "Initial" & ts <= 30){
+      tests = round(days*tst/30) 
     }
     
     if(test.timeline == "Sustained"){
-      tests = floor(tst)
+      tests = round(tst)
     }
     
-    if(test.timeline == "Both" & ts > 20){
-      tests = floor(tst*2.5)
+    if(test.timeline == "Both" & ts <= 30){
+      tests = round((tst*days/2)/30)
     }
-    if(test.timeline == "Both" & ts <= 20){
-      tests = floor(tst*0.625)
+    if(test.timeline == "Both" & ts > 30){
+      tests = round((tst*days/2)/(150-30))
     }
     out <- sir_lamp(sims, 
                     S.on[ts-1,], E.on[ts-1,], I1.on[ts-1,], I2.on[ts-1,], R.on[ts-1,], 
@@ -179,6 +186,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     symp.pcr <- rbind(symp.pcr, out[,132])
     asymp.pcr <- rbind(asymp.pcr, out[,133])
     cases.caught <- rbind(cases.caught, out[,134])
+    cases.removed <- rbind(cases.removed, out[,135])
     
     atest.wait.3 <- abind(atest.wait.3, array(out[,72:81], c(1,sims,10)), along = 1)
     atest.wait.2 <- abind(atest.wait.2, array(out[,82:91], c(1,sims,10)), along = 1)
@@ -194,7 +202,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
     isolation.off <- rbind(isolation.off,apply(comply_test_positives.off[(max(1,ts-days.to.isolate)):ts,],2,sum) + apply(symptrep.off[(max(1,ts-10)):ts,],2,sum)) # isolate for 10 days
     quarantine.off <- rbind(quarantine.off, apply(new_contacts.off[(max(1,ts-days.to.quarantine)):ts,],2,sum) )
   }
-  
+  # browser()
   inf.on <- I1.on+I2.on   # total infectious on campus
   inf.off <- I1.off+I2.off   # total infectious on campus
   case.on <- new_cases.on # daily cases
@@ -218,6 +226,7 @@ uni_sim <- function(tst = 500, test.timeline = c("Initial", "Sustained", "Both")
               "symp.pcr" = symp.pcr,
               "asymp.pcr" = asymp.pcr,
               "cases.caught" = cases.caught,
+              "cases.removed" = cases.removed,
               "tests"= matrix(tst,Tsim,sims),
               "compliance" = matrix(compliance,Tsim,sims),
               "init.prev"= matrix(init.prev,Tsim,sims),

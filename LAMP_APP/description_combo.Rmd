@@ -1,0 +1,44 @@
+  
+## SARS-CoV-2 Screening Application
+
+This application is intended to serve a way to interface with a screening model, and to apply local conditions to a generalized problem of how much to invest in screening and diagnostic testing when screening tests are both cheaper and less sensitive than diagnostic tests. This model follows from a paper submitted to PLOS Global Public Health by Rogers et al., 2022. 
+
+### Model assumptions  
+
+
+*Table 1. Parameters included in the models*
+
+|Param Type | Parameter | Code name & Default value | Comments |
+|-------------|-------------|-----------------|-------------|
+|Epidemiology|$R_0$ on campus | R0.on = 3 ||
+|            |$R_0$ off campus | R0.off = 3 ||
+|            |Exposure Period | exposure.days = 5 ||
+|            |Presymptomatic Period | presymptom.days = 2 ||
+|            |Postsymptomatic Period | postsymptom.days = 7 ||
+|| Initial Prevalence |init.prev = 0.01| |
+|| Proportion Symptomatic |ppn_sympt = 0.35  | |
+||Proportion seeking care who are symptomatic |care.seeking = 1 | |
+|| | community.intro.daily.on = 1 | |
+|| | community.prob.daily.on = c(0.1) | |
+|| | community.intro.daily.off = 1 | |
+|| | community.prob.daily.off = c(0.1) | |
+|| | immunity = input$immune | |
+|| | N0 = input$N0 | |
+|| | on.campus.prop = .25 | |
+|||||
+|Intervention |Screening Tests | tst = 0 | Number of screening tests|
+||Compliance |compliance = 1 | Proportion getting testing who should|
+|| | sens.pcr = 0.99 | |
+|| | spec.pcr = 0.99 | |
+|| | sens.lamp = .925 | |
+|| | spec.lamp = 0.98 | |
+||When to test |test.timeline = "Sustained"| Whether testing should be "Sustained", "Initial" only, or "Both"|
+|| Delay in test to isolate | test.scenario = "1 day" | |
+||Isolation Days | days.to.isolate = 10 ||
+|| Quarantine Days | days.to.quarantine = 10 ||
+|| | lamp.diagnostic = F | |
+|| | contact.tracing.limit = c(25) | |
+|| | pooling = c(input$pool_size) | |
+|| | pooling.multi = input$sens_red | |
+|| | days = 100 | |
+|| | sims = 25 | |

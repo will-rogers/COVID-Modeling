@@ -35,8 +35,8 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                       atest.wait.3,atest.wait.2,atest.wait.1,contact.wait.3,contact.wait.2,contact.wait.1,
                       test.scenario = c("2 Days","1 Day","No Delay"), sens.pcr = .99, spec.pcr = .99, 
                       sens.lamp = .8, spec.lamp = .99, lamp.diagnostic = F, contact.tracing.limit = 100, 
-                      intro.on, intro.off, pooling, pooling.multi) {
-  ts <- ts
+                      intro.on, intro.off, pooling, pooling.multi, on.campus.prop) {
+  
   dN_SE.on <- rbinom(n=sims,size=S.on,
                      prob=1-exp(-beta_vec.on*(I1.on+I2.on+I1.off+I2.off)/(N.on+N.off)*delta.t)) + intro.on # add random introductions
   dN_EI1.on <- rbinom(n=sims,size=E.on,
@@ -78,13 +78,17 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
   
   R.off. <- R.off + dN_I2R.off
   
-  out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_I1I2.on, 
-                S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_I1I2.off ) # assume that I1->I2 is when cases become detectable
+  out <- cbind( S.on.,  E.on.,  I1.on.,  I2.on., R.on., dN_EI1.on, 
+                S.off.,  E.off.,  I1.off.,  I2.off., R.off., dN_EI1.off ) # assume that I1->I2 is when cases become detectable
   sympt.pcr <- newSymptReported.on + newSymptReported.off
   
+  # if(T %in% c(out[,c(1:5,7:11)] < 0)) browser()
+  
+  out[,c(1:5,7:11)][which(out[,c(1:5,7:11)] < 0 )] <- 0
+  
   avail.tests <- tests * pooling
-    
-    atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
+    # if(0 %in% apply(out[,c(1:5,7:11)],1,sum)) browser()
+   atests <- rmultinomial(sims,avail.tests,out[,c(1:5,7:11)])
     tested <- atests
     for (i in 1:sims){
       for (j in 1:10){
@@ -114,7 +118,7 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
       asymp.pcr <- apply(tested., 1, sum)
     }
   
-    
+  
   cases.caught <- apply(tested.[,c(3,4,8,9)], 1, sum) + newSymptReported.on + newSymptReported.off
   
   sympt.isolate <- matrix(0,nr=sims,nc=10) # storage for symptomatic cases to isolate
@@ -187,17 +191,26 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                                     theta, gamma_I1I2, gamma_I2R,
                                     beta_vec.on, beta_vec.off)
   contact.wait.1 <- contacts
-
+  
   if(test.scenario == "2 Days") {
     out[,c(1:5,7:11)] <- pmax(out[,c(1:5,7:11)] - sympt.isolate - (contact.wait.3) - (atest.wait.3),0)
+    cases.removed <- apply(sympt.isolate[,c(3,4,8,9)] + 
+                             contact.wait.3[,c(3,4,8,9)] +
+                             atest.wait.3[,c(3,4,8,9)], 1, sum)
   }
-  
+  # browser()
   if(test.scenario == "1 Day") {
     out[,c(1:5,7:11)] <- pmax(out[,c(1:5,7:11)] - sympt.isolate - (contact.wait.2) - (atest.wait.2),0)
+    cases.removed <- apply(sympt.isolate[,c(3,4,8,9)] + 
+                             contact.wait.2[,c(3,4,8,9)] +
+                             atest.wait.2[,c(3,4,8,9)], 1, sum)
   }
   
   if(test.scenario == "No Delay") {
     out[,c(1:5,7:11)] <- pmax(out[,c(1:5,7:11)] - sympt.isolate - (contact.wait.1) - (atest.wait.1),0)
+    cases.removed <- apply(sympt.isolate[,c(3,4,8,9)] + 
+                             contact.wait.1[,c(3,4,8,9)] +
+                             atest.wait.1[,c(3,4,8,9)], 1, sum)
   }
   
   if(!test.scenario %in% c("2 Days","1 Day","No Delay")) {
@@ -209,7 +222,8 @@ sir_lamp <- function (sims, S.on, E.on, I1.on, I2.on,  R.on, N.on, newSympt1.on,
                contacts, tot.contacts, avail.tests, atests.isolate,
                sympt.isolate, newSymptReportedTrue.on, newSymptReportedTrue.off, 
                atest.wait.3,atest.wait.2,atest.wait.1,
-               contact.wait.3,contact.wait.2,contact.wait.1, sympt.pcr, asymp.pcr, cases.caught
+               contact.wait.3,contact.wait.2,contact.wait.1, 
+               sympt.pcr, asymp.pcr, cases.caught, cases.removed
   )
   # store all states -- SIR states plus tested, reported, contacts
 }

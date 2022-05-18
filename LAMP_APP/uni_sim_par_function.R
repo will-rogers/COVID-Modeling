@@ -22,6 +22,9 @@ uni_sims_par <- function(tst = 500,
                          days = 100, sims = 200,
                          days.to.isolate = 10,
                          days.to.quarantine = 10,
+                         exposure.days = 5, 
+                         presymptom.days = 2, 
+                         postsymptom.days = 7,
                          ncores=NULL){
   vars <- expand.grid("tst" = tst, 
                       "compliance" = compliance, 
@@ -46,10 +49,15 @@ uni_sims_par <- function(tst = 500,
                       "days" = days, "sims" = sims,
                       "test.timeline" = test.timeline,
                       "days.to.isolate" = days.to.isolate,
-                      "days.to.quarantine" = days.to.quarantine)
+                      "days.to.quarantine" = days.to.quarantine,
+                      "exposure.days" = exposure.days, 
+                      "presymptom.days" = presymptom.days,
+                      "postsymptom.days" = postsymptom.days)
   vars <- vars %>%
-    filter(R0.on == R0.off,
-           days.to.isolate == days.to.quarantine)
+    filter(R0.on == R0.off &
+             days.to.isolate == days.to.quarantine &
+             community.intro.daily.on == community.intro.daily.off &
+             community.prob.daily.on == community.prob.daily.off)
   if (is.null(ncores)){
   output <- rbindlist(apply(vars,1,FUN=function(x) uni_sim(tst = x[1], 
                                                            compliance = x[2], 
@@ -74,9 +82,14 @@ uni_sims_par <- function(tst = 500,
                                                            days = x[24], sims = x[25],
                                                            test.timeline = x[26],
                                                            days.to.isolate = x[27],
-                                                           days.to.quarantine = x[28])))
+                                                           days.to.quarantine = x[28], 
+                                                           exposure.days = x[29], 
+                                                           presymptom.days = x[30], 
+                                                           postsymptom.days = x[31])))
   } else {
-    cl <- parallel::makeCluster(ncores)
+    cl <- parallel::makeCluster(ncores, 
+                                setup_strategy = "sequential",
+                                setup_timeout = 45)
     parallel::clusterExport(cl,varlist=c('uni_sim','lengthen','sir_lamp', 'sir_simple_step'))
     parallel::clusterEvalQ(cl,{
       library(ggplot2)
@@ -110,7 +123,10 @@ uni_sims_par <- function(tst = 500,
                                                                    days = x[24], sims = x[25],
                                                                    test.timeline = x[26],
                                                                    days.to.isolate = x[27],
-                                                                   days.to.quarantine = x[28])))
+                                                                   days.to.quarantine = x[28], 
+                                                                   exposure.days = x[29], 
+                                                                   presymptom.days = x[30], 
+                                                                   postsymptom.days = x[31])))
     parallel::stopCluster(cl)
     rm('cl')
   }

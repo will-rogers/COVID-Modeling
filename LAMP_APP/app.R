@@ -4,6 +4,7 @@ library(scales)
 library(tidyverse)
 library(data.table)
 library(combinat)
+library(splines)
 source("sir_lamp_function.R")
 source("sir_simple_step_function.R")
 source("uni_sim_function.R")
@@ -19,26 +20,104 @@ body <- dashboardBody(
     ),
     fluidRow(
         box(
-            title = "Epidemic Parameters: R0",
-            sliderInput('R0', "R0", value = 2.5, min = 0, max=5, step = .25),
+            title = "Epidemic Parameters: R0 on campus",
+            sliderInput('R0.on', "R0 On", value = 3, min = 0, max=8, step = .25),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: R0 off campus",
+            sliderInput('R0.off', "R0 Off", value = 3, min = 0, max=8, step = .25),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Exposure Period",
+            sliderInput('exposure.days', "Exposure Period", value = 5, min = 0, max=10, step = 1),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Presymptomatic Period",
+            sliderInput('presymptom.days', "Presymptom Period", value = 2, min = 0, max=10, step = 1),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Postsymptomatic Period",
+            sliderInput('postsymptom.days', "Postsymptom Period", value = 7, min = 0, max=15, step = 1),
             solidHeader = TRUE,
             width = 3
         ),
         box(
             title = "Epidemic Parameters: Initial Prevalence",
-            sliderInput('init_prev', "Initial Prevalence", value = .03, min = .005, max=.1, step = .005),
+            sliderInput('init.prev', "Initial Prevalence", value = .03, min = .01, max=0.5, step = .01),
             solidHeader = TRUE,
             width = 3
         ),
         box(
             title = "Epidemic Parameters: Immunity",
-            sliderInput('immune', "Proportion immune or recovered", value = .15, min = 0, max=.2, step = .025),
+            sliderInput('immunity', "Proportion immune or recovered", value = .15, min = 0, max=1, step = .01),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Proportion Symptomatic ",
+            sliderInput('ppn_sympt', "Population Size", value = 0.65, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Proportion of Symptomatic Seeking Care",
+            sliderInput('care.seeking', "Symptomatic Seeking Care", value = 1, min = 0, max=1, step = 0.01),
             solidHeader = TRUE,
             width = 3
         ),
         box(
             title = "Epidemic Parameters: Population Size",
             sliderInput('N0', "Population Size", value = 16500, min = 0, max=30000, step = 500),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Introduction Rate On-campus",
+            sliderInput('community.prob.daily.on', "Intro. Prob", value = 0.1, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Introduction Size On-campus",
+            sliderInput('community.intro.daily.on', "Population Size", value = 1, min = 0, max=50, step = 1),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Introduction Rate Off-campus",
+            sliderInput('community.prob.daily.off', "Intro. Size", value = 0.1, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Introduction Size Off-campus",
+            sliderInput('community.intro.daily.off', "Intro. Size", value = 1, min = 0, max=50, step = 1),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Proportion on Campus",
+            sliderInput('on.campus.prop', "Prop. on Campus", value = 0.25, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Days to simulate",
+            sliderInput('days', "Days", value = 100, min = 2, max=200, step = 1),
+            solidHeader = TRUE,
+            width = 3
+        ),
+        box(
+            title = "Epidemic Parameters: Simulations",
+            sliderInput('sims', "Simulations", value = 25, min = 2, max=200, step = 1),
             solidHeader = TRUE,
             width = 3
         )
@@ -70,20 +149,77 @@ body <- dashboardBody(
     ),
     fluidRow(
         box(
-            title = "Intervention Parameters: # of tests (daily)",
-            sliderInput('test_numb', "Number of Tests ", value = 2500, min = 0, max=5000, step = 250),
+            title = "Intervention Parameters: Screening Tests",
+            sliderInput('tst', "Number of Screening Tests", value = 2500, min = 0, max=5000, step = 50),
             solidHeader = TRUE,
             width = 4
         ),
         box(
-            title = "Intervention Parameters: Test Sensitivity",
-            sliderInput('sens', "Test Sensitivity", value = .77, min = .6, max=1, step = .03),
+            title = "Intervention Parameters: Screening Test Sensitivity",
+            sliderInput('sens.lamp', "Screening Sensitivity", value = 0.75, min = 0, max=1, step = 0.01),
             solidHeader = TRUE,
             width = 4
         ),
         box(
-            title = "Intervention Parameters: Test Specificity",
-            sliderInput('spec', "Test Specificity", value = .98, min = .9, max=1, step = .01),
+            title = "Intervention Parameters: Screening Test Specificity",
+            sliderInput('spec.lamp', "Screening Specificity", value = 0.98, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: PCR Sensitivity",
+            sliderInput('sens.pcr', "PCR Sensitivity", value = 0.99, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: PCR Specificity",
+            sliderInput('spec.pcr', "PCR Specificity", value = 0.99, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: Test Timeline",
+            
+            selectInput('test.timeline', "Test Timeline", choices = c("Initial", "Sustained", "Both"), selected = "Initial"),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: Test Delay",
+            
+            selectInput('test.scenario', "Test Delay", choices = c("2 Days","1 Day","No Delay"), selected = "1 Day"),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: Does the screening test serve as a diagnostic?",
+            
+            selectInput('lamp.diagnostic', "Screening Test Legally Appropriate", choices = c(TRUE, FALSE), selected = FALSE),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: Compliance",
+            sliderInput('compliance', "Compliance", value = 1, min = 0, max=1, step = 0.01),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: Contact Tracing Limit",
+            sliderInput('contact.tracing.limit', "Contact Tracing Limit", value = 25, min = 0, max=500, step = 1),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: Days to Isolate",
+            sliderInput('days.to.isolate', "Days to Isolate", value = 25, min = 0, max=500, step = 1),
+            solidHeader = TRUE,
+            width = 4
+        ),
+        box(
+            title = "Intervention Parameters: Days to Quarantine",
+            sliderInput('days.to.quarantine', "Days to Quarantine", value = 25, min = 0, max=500, step = 1),
             solidHeader = TRUE,
             width = 4
         )
@@ -91,13 +227,13 @@ body <- dashboardBody(
     fluidRow(
         box(
             title = "LAMP Pool Size: ",
-            sliderInput('pool_size', "LAMP Pool Size", value = 1, min = 1, max=10, step = 1),
+            sliderInput('pooling', "LAMP Pool Size", value = 1, min = 1, max=10, step = 1),
             solidHeader = TRUE,
             width = 6
         ),
         box(
             title = "Pooled Sensitivity Reduction: ",
-            sliderInput('sens_red', "Pooled Sensitivity Reduction", value = 0, min = 0, max=.1, step = .01),
+            sliderInput('pooling.multi', "Pooled Sensitivity Reduction", value = 0, min = 0, max=.1, step = .01),
             solidHeader = TRUE,
             width = 6
         )
@@ -189,72 +325,85 @@ ui <- dashboardPage(
     dashboardHeader(title = "Bobcat LAMP: A Safe, Economically Viable Return to Campus",
                     titleWidth = 800),
     sidebar,
+    # tabPanel("ModelDescription",
+    #          withMathJax(includeHTML("description_combo.html"))
+    # ),
     body
 )
 
 server <- function(input, output){
     no_intervention <- reactive({
-       uni_sims_par(tst = c(0),
-                             test.timeline = c("Sustained"),
-                             compliance = c(1),
-                             init.prev = input$init_prev,
-                             ppn_sympt = c(0.35),
-                             care.seeking = c(1),
-                             R0.on = input$R0,
-                             R0.off = input$R0,
-                             test.scenario = c("1 Day"),
-                             sens.pcr = 0.99,
-                             spec.pcr = 0.99,
-                             sens.lamp = c(.925),
-                             spec.lamp = 0.98,
-                             lamp.diagnostic = c(F),
-                             community.intro.daily.on = 1,
-                             community.prob.daily.on = c(0.1),
-                             community.intro.daily.off = 1,
-                             community.prob.daily.off = c(0.1),
-                             immunity = input$immune,
-                             N0 = input$N0,
-                             on.campus.prop = .25,
-                             contact.tracing.limit = c(25),
-                             pooling = c(input$pool_size),
-                             pooling.multi = input$sens_red,
-                             days = 100,
-                             sims = 25,
-                             ncores=1)
+        uni_sims_par(tst = 0, 
+                     test.timeline = input$test.timeline,
+                     compliance = input$compliance, 
+                     init.prev = input$init.prev, 
+                     ppn_sympt = input$ppn_sympt, 
+                     care.seeking = input$care.seeking, 
+                     R0.on = input$R0.on,  
+                     R0.off = input$R0.off, 
+                     test.scenario = input$test.scenario,
+                     sens.pcr = input$sens.pcr, 
+                     spec.pcr = input$spec.pcr, 
+                     sens.lamp = input$sens.lamp, 
+                     spec.lamp = input$spec.lamp, 
+                     lamp.diagnostic = input$lamp.diagnostic, 
+                     community.intro.daily.on = input$community.intro.daily.on, 
+                     community.prob.daily.on = input$community.prob.daily.on,
+                     community.intro.daily.off = input$community.intro.daily.off, 
+                     community.prob.daily.off = input$community.prob.daily.off,
+                     immunity = input$immunity, 
+                     N0 = input$N0, 
+                     on.campus.prop = input$on.campus.prop, 
+                     contact.tracing.limit = input$contact.tracing.limit,
+                     pooling = input$pooling, 
+                     pooling.multi = input$pooling.multi,
+                     days = input$days, 
+                     sims = input$sims,
+                     days.to.isolate = input$days.to.isolate,
+                     days.to.quarantine = input$days.to.quarantine,
+                     exposure.days = input$exposure.days, 
+                     presymptom.days = input$presymptom.days, 
+                     postsymptom.days = input$postsymptom.days,
+                     ncores=1)
     })
     
     intervention <- reactive({
-        uni_sims_par(tst = input$test_numb,
-                     test.timeline = c("Sustained"),
-                     compliance = c(1),
-                     init.prev = input$init_prev,
-                     ppn_sympt = c(0.35),
-                     care.seeking = c(1),
-                     R0.on = input$R0,
-                     R0.off = input$R0,
-                     test.scenario = c("1 Day"),
-                     sens.pcr = 0.99,
-                     spec.pcr = 0.99,
-                     sens.lamp = input$sens,
-                     spec.lamp = input$spec,
-                     lamp.diagnostic = c(F),
-                     community.intro.daily.on = 1,
-                     community.prob.daily.on = c(0.1),
-                     community.intro.daily.off = 1,
-                     community.prob.daily.off = c(0.1),
-                     immunity = input$immune,
-                     N0 = input$N0,
-                     on.campus.prop = .25,
-                     contact.tracing.limit = c(25),
-                     pooling = c(input$pool_size),
-                     pooling.multi = input$sens_red,
-                     days = 100,
-                     sims = 25,
+        uni_sims_par(tst = input$tst, 
+                     test.timeline = input$test.timeline,
+                     compliance = input$compliance, 
+                     init.prev = input$init.prev, 
+                     ppn_sympt = input$ppn_sympt, 
+                     care.seeking = input$care.seeking, 
+                     R0.on = input$R0.on,  
+                     R0.off = input$R0.off, 
+                     test.scenario = input$test.scenario,
+                     sens.pcr = input$sens.pcr, 
+                     spec.pcr = input$spec.pcr, 
+                     sens.lamp = input$sens.lamp, 
+                     spec.lamp = input$spec.lamp, 
+                     lamp.diagnostic = input$lamp.diagnostic, 
+                     community.intro.daily.on = input$community.intro.daily.on, 
+                     community.prob.daily.on = input$community.prob.daily.on,
+                     community.intro.daily.off = input$community.intro.daily.off, 
+                     community.prob.daily.off = input$community.prob.daily.off,
+                     immunity = input$immunity, 
+                     N0 = input$N0, 
+                     on.campus.prop = input$on.campus.prop, 
+                     contact.tracing.limit = input$contact.tracing.limit,
+                     pooling = input$pooling, 
+                     pooling.multi = input$pooling.multi,
+                     days = input$days, 
+                     sims = input$sims,
+                     days.to.isolate = input$days.to.isolate,
+                     days.to.quarantine = input$days.to.quarantine,
+                     exposure.days = input$exposure.days, 
+                     presymptom.days = input$presymptom.days, 
+                     postsymptom.days = input$postsymptom.days,
                      ncores=1)
     })
     
     output$epi_curve <- renderPlot(
-       
+        
         no_intervention() %>%
             group_by(group) %>%
             mutate(cum.cases.on = cumsum(new.cases.on),
@@ -325,7 +474,7 @@ server <- function(input, output){
             )  %>%
             ggplot(aes(x = day, y = cum.iso.on + cum.iso.off + cum.qua.on + cum.qua.off, group = factor(group))) +
             geom_path(alpha = .4) + theme_bw() + ylab("Number of Student Class Days Missed \n Due to Isolation or Quarantine") +
-        
+            
             scale_y_continuous(limits = c(0,no_intervention() %>%
                                               group_by(group) %>%
                                               mutate(cum.iso.on = cumsum(isolation.complying.on),
@@ -337,16 +486,16 @@ server <- function(input, output){
     )
     output$no_strategy <- renderText(
         paste("The total cost of PCR testing is",
-        no_intervention() %>%
-            group_by(group) %>%
-            mutate(pcr.demand.sym = cumsum(symp.pcr), 
-                   pcr.demand.asym = cumsum(asymp.pcr),
-                   total.pcr = pcr.demand.sym * (1 / input$pos_rate) + pcr.demand.asym
-            ) %>% group_by(group) %>%
-            summarise(value=last(total.pcr)) %>% ungroup() %>%
-            summarise(tests = mean(value) ) %>% 
-            mutate(total_cost = tests * input$pcr_cost) %>% pull()  %>% dollar_format()()
-    , "on average"))
+              no_intervention() %>%
+                  group_by(group) %>%
+                  mutate(pcr.demand.sym = cumsum(symp.pcr), 
+                         pcr.demand.asym = cumsum(asymp.pcr),
+                         total.pcr = pcr.demand.sym * (1 / input$pos_rate) + pcr.demand.asym
+                  ) %>% group_by(group) %>%
+                  summarise(value=last(total.pcr)) %>% ungroup() %>%
+                  summarise(tests = mean(value) ) %>% 
+                  mutate(total_cost = tests * input$pcr_cost) %>% pull()  %>% dollar_format()()
+              , "on average"))
     output$strategy <- renderText(
         paste("The total cost of PCR testing + LAMP is",
               intervention() %>%
@@ -357,8 +506,8 @@ server <- function(input, output){
                   ) %>% group_by(group) %>%
                   summarise(value=last(total.pcr)) %>% ungroup() %>%
                   summarise(tests = mean(value)) %>% 
-                  mutate(total_cost = tests * input$pcr_cost + input$lamp_cost * 100 * input$test_numb) %>% pull()  %>% dollar_format()()
-        , "on average"))
+                  mutate(total_cost = tests * input$pcr_cost + input$lamp_cost * 100 * input$tst) %>% pull()  %>% dollar_format()()
+              , "on average"))
     output$no_strategy_size <- renderText(
         paste("The total number of positive COVID-19 cases is",
               no_intervention() %>%
@@ -384,13 +533,13 @@ server <- function(input, output){
     output$strategy_iso <- renderText(
         paste("The total number of on campus student days spent in quarantine or isolation is",
               round(intervention() %>%
-                  group_by(group) %>%
-                  mutate(cum.iso.on = cumsum(isolation.complying.on),
-                         cum.qua.on = cumsum(quarantine.complying.on),
-                         iso = cum.iso.on + cum.qua.on
-                  ) %>% group_by(group) %>%
-                  summarise(value=last(iso)) %>% ungroup() %>%
-                  summarise(tests = mean(value)) %>% pull()  / input$N0 / .25,1),
+                        group_by(group) %>%
+                        mutate(cum.iso.on = cumsum(isolation.complying.on),
+                               cum.qua.on = cumsum(quarantine.complying.on),
+                               iso = cum.iso.on + cum.qua.on
+                        ) %>% group_by(group) %>%
+                        summarise(value=last(iso)) %>% ungroup() %>%
+                        summarise(tests = mean(value)) %>% pull()  / input$N0 / .25,1),
               'per on campus student'
         )
     )
@@ -462,33 +611,33 @@ server <- function(input, output){
     output$strategy_total_cost <- renderText(
         paste("The implied total cost of testing, quarantine, missed class days is",
               (intervention() %>%
-                  group_by(group) %>%
-                  mutate(cum.iso.on = cumsum(isolation.complying.on),
-                         cum.iso.off = cumsum(isolation.complying.off),
-                         cum.qua.on = cumsum(quarantine.complying.on),
-                         cum.qua.off = cumsum(quarantine.complying.off),
-                         missed = cum.iso.on + cum.qua.on + cum.iso.off + cum.qua.off
-                  ) %>% group_by(group) %>%
-                  summarise(value=last(missed)) %>% ungroup() %>%
-                  summarise(tests = mean(value) * input$missed_cost) %>% pull() %>% round()  +
-                  intervention() %>%
-                  group_by(group) %>%
-                  mutate(cum.iso.on = cumsum(isolation.complying.on),
-                         cum.qua.on = cumsum(quarantine.complying.on),
-                         iso = cum.iso.on + cum.qua.on
-                  ) %>% group_by(group) %>%
-                  summarise(value=last(iso)) %>% ungroup() %>%
-                  summarise(tests = mean(value)* input$iso_cost) %>% pull() %>% round() + 
-                  intervention() %>%
-                  group_by(group) %>%
-                  mutate(pcr.demand.sym = cumsum(symp.pcr), 
-                         pcr.demand.asym = cumsum(asymp.pcr),
-                         total.pcr = pcr.demand.sym * (1 / input$pos_rate) + pcr.demand.asym
-                  ) %>% group_by(group) %>%
-                  summarise(value=last(total.pcr)) %>% ungroup() %>%
-                  summarise(tests = mean(value)) %>% 
-                  mutate(total_cost = tests * input$pcr_cost + input$lamp_cost * 100 * input$test_numb) %>% pull())
-                  %>% dollar_format()()
+                   group_by(group) %>%
+                   mutate(cum.iso.on = cumsum(isolation.complying.on),
+                          cum.iso.off = cumsum(isolation.complying.off),
+                          cum.qua.on = cumsum(quarantine.complying.on),
+                          cum.qua.off = cumsum(quarantine.complying.off),
+                          missed = cum.iso.on + cum.qua.on + cum.iso.off + cum.qua.off
+                   ) %>% group_by(group) %>%
+                   summarise(value=last(missed)) %>% ungroup() %>%
+                   summarise(tests = mean(value) * input$missed_cost) %>% pull() %>% round()  +
+                   intervention() %>%
+                   group_by(group) %>%
+                   mutate(cum.iso.on = cumsum(isolation.complying.on),
+                          cum.qua.on = cumsum(quarantine.complying.on),
+                          iso = cum.iso.on + cum.qua.on
+                   ) %>% group_by(group) %>%
+                   summarise(value=last(iso)) %>% ungroup() %>%
+                   summarise(tests = mean(value)* input$iso_cost) %>% pull() %>% round() + 
+                   intervention() %>%
+                   group_by(group) %>%
+                   mutate(pcr.demand.sym = cumsum(symp.pcr), 
+                          pcr.demand.asym = cumsum(asymp.pcr),
+                          total.pcr = pcr.demand.sym * (1 / input$pos_rate) + pcr.demand.asym
+                   ) %>% group_by(group) %>%
+                   summarise(value=last(total.pcr)) %>% ungroup() %>%
+                   summarise(tests = mean(value)) %>% 
+                   mutate(total_cost = tests * input$pcr_cost + input$lamp_cost * 100 * input$tst) %>% pull())
+              %>% dollar_format()()
         )
     )
     output$nostrategy_total_cost <- renderText(
@@ -530,3 +679,4 @@ server <- function(input, output){
 # Run App
 ##########################
 shinyApp(ui = ui, server = server)
+
